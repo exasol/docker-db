@@ -2,22 +2,22 @@ FROM centos:6
 
 MAINTAINER EXASOL "service@exasol.com"
 
-RUN yum update -y
-RUN yum install -y java-1.8.0-openjdk-headless openssh-server openssh-clients which sudo vim tar rsync
+LABEL name="EXASOL DB Docker Image Selfcontained" \
+      version="6.0.1-d1sc" \
+      dbversion="6.0.1" \
+      osversion="6.0.1" \
+      license="Proprietary" \
+      vendor="EXASOL AG"
 
-LABEL name="EXASOL DB Docker Image Selfcontained"
-LABEL version="6.0.1-d1sc"
-LABEL dbversion="6.0.1"
-LABEL osversion="6.0.1"
-LABEL license="Proprietary"
-LABEL vendor="EXASOL AG"
-                                  
+RUN yum update -y --exclude=kernel* && yum install -y \
+      java-1.8.0-openjdk-headless \
+      openssh-server \
+      openssh-client && \
+      yum clean all
+
+COPY license.xml EXAConf sc_init.sh /exa/etc/
+ADD EXAClusterOS-6.0.1_LS-DOCKER-CentOS-6.8_x86_64.tar.gz /
+
 ENV PATH=/usr/opt/EXASuite-6/EXAClusterOS-6.0.1/bin:/usr/opt/EXASuite-6/EXAClusterOS-6.0.1/sbin:/usr/opt/EXASuite-6/EXARuntime-6.0.1/bin:/usr/opt/EXASuite-6/EXARuntime-6.0.1/bin:/usr/opt/EXASuite-6/EXASolution-6.0.1/bin/Console:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ADD EXAClusterOS-6.0.1_LS-DOCKER-CentOS-6.8_x86_64.tar.gz              /
 
-COPY license.xml /exa/etc/license.xml
-COPY sc.conf /exa/etc/EXAConf
-COPY sc_init.sh /exa/etc/sc_init.sh
-# COPY myjarfile.jar /exa/data/bucketfs/bfsdefault/default/myjarfile.jar
-
-CMD /bin/sh /exa/etc/sc_init.sh
+ENTRYPOINT ["/exa/etc/sc_init.sh"]
