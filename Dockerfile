@@ -26,7 +26,7 @@ LABEL name="EXASOL DB Docker Image"  \
 
 COPY license/license.xml     /.license.xml
 ADD EXAClusterOS-6.0.11_LS-DOCKER-CentOS-6.8_x86_64.tar.gz              /
-ENV PATH=/usr/opt/EXASuite-6/EXAClusterOS-6.0.11/bin:/usr/opt/EXASuite-6/EXAClusterOS-6.0.11/sbin:/usr/opt/EXASuite-6/EXARuntime-6.0.11/bin:/usr/opt/EXASuite-6/EXARuntime-6.0.11/sbin:/usr/op/EXASuite-6/EXASolution-6.0.11/bin/Console:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+ENV PATH=/usr/opt/EXASuite-6/EXAClusterOS-6.0.11/bin:/usr/opt/EXASuite-6/EXAClusterOS-6.0.11/sbin:/usr/opt/EXASuite-6/EXARuntime-6.0.11/bin:/usr/opt/EXASuite-6/EXARuntime-6.0.11/sbin:/usr/opt/EXASuite-6/EXASolution-6.0.11/bin/Console:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     MANPATH=/usr/opt/EXASuite-6/EXAClusterOS-6.0.11/man:/usr/local/share/man:/usr/share/man \
     EXA_IMG_VERSION="6.0.11-d1" \
     EXA_DB_VERSION="6.0.11" \
