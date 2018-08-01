@@ -72,7 +72,7 @@ class device_handler:
             dev = dev[:-len(self.exaconf.meta_dev_suffix)]
         # search the device_mapping for the given device
         # --> device-name in mapping may also have suffix!
-        if disk_conf.has_key("mapping"):
+        if "mapping" in disk_conf:
             for mdev,path in disk_conf.mapping:
                 if mdev.endswith(self.exaconf.data_dev_suffix):
                     mdev = mdev[:-len(self.exaconf.data_dev_suffix)]
@@ -106,7 +106,7 @@ class device_handler:
             my_conf = nodes_conf[node_id]
             # add mapped devices (they have absolute paths)
             for disk in my_conf.disks.itervalues():
-                if disk.has_key("mapped_devices"):
+                if "mapped_devices" in disk:
                     for host_path, c in disk.mapped_devices:
                         devices.add(host_path)
             # add "normal" file-devices
@@ -208,7 +208,7 @@ class device_handler:
         # make list of all directories (default storage_dir + mapped directories)
         directories = []
         for disk in node_conf.disks.itervalues():
-            if disk.has_key("mapping"):
+            if "mapping" in disk:
                 for dev,path in disk.mapping:
                     # use parent directory in case of mapped files!
                     path = os.path.realpath(path)

@@ -303,7 +303,7 @@ class docker_handler:
             # --> each file-device needs to be mounted into the storage-directory within the container
             if docker_conf.device_type == 'file':
                 for disk in my_conf.disks.itervalues():
-                    if disk.has_key("mapped_devices"):
+                    if "mapped_devices" in disk:
                         for dev_host, dev_container in disk.mapped_devices:
                             binds.append(dev_host + ":" + dev_container + ":rw")
                             volumes.append(dev_container)
@@ -322,7 +322,7 @@ class docker_handler:
             # d. BucketFS volumes
             for bfs_name in bucketfs_conf.fs.keys():
                 bfs_conf = bucketfs_conf.fs[bfs_name]
-                if bfs_conf.has_key("path") and bfs_conf.path != "":
+                if "path" in bfs_conf and bfs_conf.path != "":
                     bfs_host = os.path.join(bfs_conf.path, my_conf.name, bfs_name)
                     bfs_container = os.path.join(self.exaconf.container_root, self.exaconf.bucketfs_dir, bfs_name)
                     binds.append(bfs_host + ":" + bfs_container + ":rw")
@@ -334,7 +334,7 @@ class docker_handler:
 
             # port bindings
             port_binds = {}
-            if my_conf.has_key("exposed_ports"):
+            if "exposed_ports" in my_conf:
                 port_binds = dict(my_conf.exposed_ports)
             # create host config
             hc = self.client.create_host_config(privileged = docker_conf.privileged,
@@ -593,11 +593,11 @@ class docker_handler:
             # 3.1 Copy SSL files (if they exist)
             try:
                 ssl_conf = self.exaconf.get_ssl_conf()
-                if ssl_conf.has_key("cert") and os.path.isfile(ssl_conf.cert):
+                if "cert" in ssl_conf and os.path.isfile(ssl_conf.cert):
                     shutil.copy(ssl_conf.cert, os.path.join(volume, self.exaconf.ssl_dir))
-                if ssl_conf.has_key("cert_key") and os.path.isfile(ssl_conf.cert_key):
+                if "cert_key" in ssl_conf and os.path.isfile(ssl_conf.cert_key):
                     shutil.copy(ssl_conf.cert_key, os.path.join(volume, self.exaconf.ssl_dir))
-                if ssl_conf.has_key("cert_auth") and os.path.isfile(ssl_conf.cert_auth):
+                if "cert_auth" in ssl_conf and os.path.isfile(ssl_conf.cert_auth):
                     shutil.copy(ssl_conf.cert_auth, os.path.join(volume, self.exaconf.ssl_dir))
             except EXAConf.EXAConfError as e:
                 print "Skipping SSL configuration (not present in EXAConf)."

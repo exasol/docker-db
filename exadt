@@ -172,7 +172,7 @@ def delete_cluster(cmd):
             print e
         for node in nodes_conf.itervalues():
             for disk in node.disks.itervalues():
-                if disk.has_key("mapping"):
+                if "mapping" in disk:
                     for dev,path in disk.mapping:
                         try:
                             # follow symlink
@@ -768,7 +768,7 @@ def ps(cmd):
     width[5] = max(max(len(c['Names'][0].lstrip("/")) for c in containers), len("CONTAINER NAME"))
     width[6] = 0
     for c in containers:
-        ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if d.has_key('PublicPort') ]
+        ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if 'PublicPort' in d]
         ports_str = ",".join([str(p[0]) + "->" + str(p[1]) for p in ports])
         if len(ports_str) > width[6]:
             width[6] = len(ports_str)
@@ -782,7 +782,7 @@ def ps(cmd):
                                                                       width[5], "CONTAINER NAME", 
                                                                       width[6], "EXPOSED PORTS")
     for c in containers:
-        ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if d.has_key('PublicPort') ]
+        ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if 'PublicPort' in d]
         ports_str = ",".join([str(p[0]) + "->" + str(p[1]) for p in ports])
         print " %- *s   %- *s   %- *s   %- *s   %- .*s   %- *s   %- *s" % (width[0], c['Labels']['NodeID'], 
                                                                            width[1], c['Status'], 
