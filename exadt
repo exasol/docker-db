@@ -3,6 +3,7 @@
 import sys, os, argparse, pprint, subprocess, time, tarfile, io, docker
 from libexadt import exadt_conf, docker_handler, device_handler, docker_rpc_handler, EXAConf, utils
 import shutil
+from builtins import input
 from libexadt.EXAConf import config
 
 # Flush STDOUT continuously
@@ -51,7 +52,7 @@ def confirm(msg):
 
     choice = ""
     while choice not in set(['y','Y','n','N']):
-        choice = raw_input("%s (y/n): " % msg).lower()
+        choice = input("%s (y/n): " % msg).lower()
     return choice == 'y'
 #}}}
 
