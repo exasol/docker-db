@@ -3,6 +3,7 @@ from docker.utils import kwargs_from_env
 from . import device_handler, EXAConf
 from .utils import rotate_file
 from .EXAConf import config
+from six import itervalues
 
 ip_types = { 4: 'ipv4_address', 6: 'ipv6_address' }
  
@@ -302,7 +303,7 @@ class docker_handler:
             # b. mapped file-devices
             # --> each file-device needs to be mounted into the storage-directory within the container
             if docker_conf.device_type == 'file':
-                for disk in my_conf.disks.itervalues():
+                for disk in itervalues(my_conf.disks):
                     if disk.has_key("mapped_devices"):
                         for dev_host, dev_container in disk.mapped_devices:
                             binds.append(dev_host + ":" + dev_container + ":rw")
@@ -310,7 +311,7 @@ class docker_handler:
             # c. block devices
             # --> only takes effect if "privileged == False" (otherwise all devices are accessible anyway)
             elif docker_conf.device_type == 'block':
-                for disk in my_conf.disks.itervalues():
+                for disk in itervalues(my_conf.disks):
                     for dev, meta in disk.devices:
                         # FIXME : use mapping if given
                         dev_host = os.path.join(os.path.join(my_conf.docker_volume, self.exaconf.storage_dir), dev)

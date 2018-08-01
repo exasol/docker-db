@@ -4,6 +4,7 @@ import os, glob
 from . import EXAConf
 from .utils import bytes2units
 from collections import OrderedDict as odict
+from six import itervalues
 
 #{{{ Class DeviceError
 class DeviceError(Exception):
@@ -105,12 +106,12 @@ class device_handler:
         for node_id in nodes_conf.keys():
             my_conf = nodes_conf[node_id]
             # add mapped devices (they have absolute paths)
-            for disk in my_conf.disks.itervalues():
+            for disk in itervalues(my_conf.disks):
                 if disk.has_key("mapped_devices"):
                     for host_path, c in disk.mapped_devices:
                         devices.add(host_path)
             # add "normal" file-devices
-            for disk in my_conf.disks.itervalues():
+            for disk in itervalues(my_conf.disks):
                 for dev, meta in disk.devices:
                     if not self.is_mapped_device(dev, disk):
                         devices.add(os.path.join(os.path.join(my_conf.docker_volume, self.exaconf.storage_dir), dev))
@@ -172,7 +173,7 @@ class device_handler:
  
         # build a list of all node devices 
         devices = []
-        for disk in node_conf.disks.itervalues():
+        for disk in itervalues(node_conf.disks):
             for dev, meta in disk.devices:
                 devices.append(dev)
         # find the highest number
@@ -207,7 +208,7 @@ class device_handler:
 
         # make list of all directories (default storage_dir + mapped directories)
         directories = []
-        for disk in node_conf.disks.itervalues():
+        for disk in itervalues(node_conf.disks):
             if disk.has_key("mapping"):
                 for dev,path in disk.mapping:
                     # use parent directory in case of mapped files!

@@ -4,6 +4,7 @@ import sys, os, argparse, pprint, subprocess, time, tarfile, io, docker
 from libexadt import exadt_conf, docker_handler, device_handler, docker_rpc_handler, EXAConf, utils
 import shutil
 from builtins import input
+from six import itervalues
 from libexadt.EXAConf import config
 
 # Flush STDOUT continuously
@@ -171,8 +172,8 @@ def delete_cluster(cmd):
             nodes_conf = exaconf.get_nodes_conf()
         except EXAConf.EXAConfError as e:
             print e
-        for node in nodes_conf.itervalues():
-            for disk in node.disks.itervalues():
+        for node in itervalues(nodes_conf):
+            for disk in itervalues(node.disks):
                 if disk.has_key("mapping"):
                     for dev,path in disk.mapping:
                         try:
@@ -693,7 +694,7 @@ def update_cluster(cmd):
         print e
         sys.exit(1)
     # create missing directories
-    for node_conf in nodes_conf.itervalues():
+    for node_conf in itervalues(nodes_conf):
         create_node_dirs(node_conf.docker_volume, exaconf)
     # print update info
     col_width = len(old_docker_image)
