@@ -1,7 +1,7 @@
-import sys, os, stat, ipaddr, configobj, StringIO, hashlib, re
+import sys, os, stat, ipaddr, configobj, hashlib, re
 from .utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
 from collections import OrderedDict as odict
-from six import iteritems, iterkeys
+from six import iteritems, iterkeys, StringIO
 
 #{{{ Class EXAConfError
 class EXAConfError(Exception):
@@ -457,7 +457,7 @@ class EXAConf:
         self.config["Global"]["Revision"] = "PLACEHOLDER"
         self.config["Global"]["Checksum"] = "PLACEHOLDER"
         # write config to string
-        serialized_conf = StringIO.StringIO()
+        serialized_conf = StringIO()
         self.config.write(outfile=serialized_conf)
         # compute MD5 sum
         md5 = hashlib.md5()
