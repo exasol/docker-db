@@ -4,7 +4,7 @@ import sys, os, argparse, pprint, subprocess, time, tarfile, io, docker
 from libexadt import exadt_conf, docker_handler, device_handler, docker_rpc_handler, EXAConf, utils
 import shutil
 from builtins import input
-from six import iterkeys, itervalues
+from six import iteritems, iterkeys, itervalues
 from libexadt.EXAConf import config
 
 # Flush STDOUT continuously
@@ -578,7 +578,7 @@ def list_clusters(cmd):
                                                               width[3], "IMAGE VERSION", 
                                                               width[4], "DB VERSION", 
                                                               width[5], "OS VERSION")
-    for cluster,ci in clusters_info.iteritems():
+    for cluster,ci in iteritems(clusters_info):
         print " %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], cluster,
                                                                   width[1], ci.root,
                                                                   width[2], ci.image,
@@ -619,7 +619,7 @@ def start_cluster(cmd):
             print "EXAConf version (%s) is not compatible with image version (%s). Please update your installation!" % (ev, iv)
             sys.exit(1)
         # check if the volumes all have disks assigned
-        for name,vol in exaconf.get_storage_volumes().iteritems():
+        for name,vol in iteritems(exaconf.get_storage_volumes()):
             if vol.disk is None:
                 print "Volume '%s' has no disk! Aborting cluster startup." % name
                 sys.exit(1)
@@ -1025,7 +1025,7 @@ def collect_info(cmd):
         # add "/logs" and "/etc" directories
         if initialized:
             nodes_conf = exaconf.get_nodes_conf()
-            for nid, conf in nodes_conf.iteritems():
+            for nid, conf in iteritems(nodes_conf):
                 # logs
                 try:
                     tar.add(os.path.join(conf.docker_volume, "logs"), 

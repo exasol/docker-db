@@ -1,7 +1,7 @@
 import sys, os, stat, ipaddr, configobj, StringIO, hashlib, re
 from .utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
 from collections import OrderedDict as odict
-from six import iterkeys
+from six import iteritems, iterkeys
 
 #{{{ Class EXAConfError
 class EXAConfError(Exception):
@@ -339,7 +339,7 @@ class EXAConf:
         # get all databases with the current (old) version and replace with given one
         filters = {"Version" : self.db_version}
         db_configs = self.get_databases(filters=filters)
-        for db in db_configs.iteritems():
+        for db in iteritems(db_config):
             db_sec = self.config["DB : " + db[0]]
             db_sec["Version"] = db_version
 
@@ -349,8 +349,8 @@ class EXAConf:
         new_suite_name = "EXASuite-" + db_version.split(".")[0].strip()
         new_db_name = "EXASolution-" + db_version
         bucketfs_conf = self.get_bucketfs_conf()
-        for bfs in bucketfs_conf.fs.iteritems():
-            for bucket in bfs[1].buckets.iteritems():
+        for bfs in iteritems(bucketfs_conf.fs):
+            for bucket in iteritems(bfs[1].buckets):
                 bucket_sec = self.config['BucketFS : ' + bfs[0]]['Bucket : ' + bucket[0]]
                 if "AdditionalFiles" in bucket_sec.scalars:
                     # replace the combo first (e. g. "EXASuite-5/EXASolution-5.0.1" with "EXASuite-6/EXASolution-6.0.0"
@@ -379,8 +379,8 @@ class EXAConf:
         new_suite_name = "EXASuite-" + os_version.split(".")[0].strip()
         new_os_name = "EXAClusterOS-" + os_version
         bucketfs_conf = self.get_bucketfs_conf()
-        for bfs in bucketfs_conf.fs.iteritems():
-            for bucket in bfs[1].buckets.iteritems():
+        for bfs in iteritems(bucketfs_conf.fs):
+            for bucket in iteritems(bfs[1].buckets):
                 bucket_sec = self.config['BucketFS : ' + bfs[0]]['Bucket : ' + bucket[0]]
                 if "AdditionalFiles" in bucket_sec.scalars:
                     # replace the combo first (e. g. "EXASuite-5/EXAClusterOS-5.0.1" with "EXASuite-6/EXAClusterOS-6.0.0"
@@ -1067,7 +1067,7 @@ class EXAConf:
             filters["name"] = volume
         volumes = self.get_storage_volumes(filters=filters)
 
-        for vol in volumes.iteritems():
+        for vol in iteritems(volumes):
             vol_sec = self.config["EXAVolume : " + vol[0]]
             if "owner" in iterkeys(config):
                 vol_sec["Owner"] = str(config.owner[0]) + " : " + str(config.owner[1])
@@ -1087,7 +1087,7 @@ class EXAConf:
             filters["name"] = database
         dbs = self.get_databases(filters=filters)
 
-        for db in dbs.iteritems():
+        for db in iteritems(dbs):
             db_sec = self.config["DB : " + db[0]]
             if "owner" in iterkeys(config):
                 db_sec["Owner"] = str(config.owner[0]) + " : " + str(config.owner[1])
@@ -1657,7 +1657,7 @@ class EXAConf:
         if not filters:
             return configs
         for item in configs.items(): # use a copy!
-            for f in filters.iteritems():
+            for f in iteritems(filters):
                 if f[0] in iterkeys(item[1]) and f[1] != item[1][f[0]]:
                     del configs[item[0]]
                     break
@@ -1787,7 +1787,7 @@ class EXAConf:
         volumes = self.get_storage_volumes(filters=filters)
         bytes_per_volume_node = bytes_per_node / len(volumes)
 
-        for volume in volumes.iteritems():
+        for volume in iteritems(volumes):
             vol_sec = self.config["EXAVolume : " + volume[0]]
             vol_sec["Disk"] = disk
             # decrease volume size to the next multiple of the vol_resize_step (if given)

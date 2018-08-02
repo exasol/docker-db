@@ -3,7 +3,7 @@ from docker.utils import kwargs_from_env
 from . import device_handler, EXAConf
 from .utils import rotate_file
 from .EXAConf import config
-from six import itervalues
+from six import iteritems, itervalues
 
 ip_types = { 4: 'ipv4_address', 6: 'ipv6_address' }
  
@@ -244,7 +244,7 @@ class docker_handler:
             raise DockerError("Failed to query information about image '%s': %s" % (image_name, e))
         # add labels
         image_conf['labels'] =  config()
-        for item in image['ContainerConfig']['Labels'].iteritems():
+        for item in iteritems(image['ContainerConfig']['Labels']):
             image_conf['labels'][item[0]] = item[1]
         return image_conf
 #}}}
@@ -538,7 +538,7 @@ class docker_handler:
         try:
             exaconf_list = []
             node_volumes = self.exaconf.get_docker_node_volumes()
-            for n,volume in node_volumes.iteritems():
+            for n,volume in iteritems(node_volumes):
                 node_etc_dir = os.path.join(volume, self.exaconf.etc_dir)
                 if os.path.exists(os.path.join(node_etc_dir, "EXAConf")):
                     exaconf_list.append(EXAConf.EXAConf(node_etc_dir, True))
@@ -588,7 +588,7 @@ class docker_handler:
             license = self.exaconf.get_license_file()
             node_volumes = self.exaconf.get_docker_node_volumes()
             self.log("Copying EXAConf and license to all node volumes.")
-            for n,volume in node_volumes.iteritems():
+            for n,volume in iteritems(node_volumes):
                 shutil.copy(conf_path, os.path.join(volume, self.exaconf.etc_dir))
                 shutil.copy(license, os.path.join(volume, self.exaconf.etc_dir))
             # 3.1 Copy SSL files (if they exist)
