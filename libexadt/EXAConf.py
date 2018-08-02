@@ -1,6 +1,7 @@
 import sys, os, stat, ipaddr, configobj, StringIO, hashlib, re
 from .utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
 from collections import OrderedDict as odict
+from six import iterkeys
 
 #{{{ Class EXAConfError
 class EXAConfError(Exception):
@@ -633,7 +634,7 @@ class EXAConf:
         db_sec["Owner"] = str(get_euid()) + " : " + str(get_egid())
         db_sec["MemSize"] = '%s GiB' % str(self.get_num_nodes() * 2) # 2 GiB per node
         db_sec["Port"] = str(self.def_db_port)
-        db_sec["Nodes"] = [ str(n) for n in self.get_nodes_conf().iterkeys() ] # list is correctly converted by ConfigObj
+        db_sec["Nodes"] = [ str(n) for n in iterkeys(self.get_nodes_conf()) ] # list is correctly converted by ConfigObj
         db_sec["NumMasterNodes"] = str(self.get_num_nodes())
         db_sec["Params"] = ""      
         # comments
@@ -1068,7 +1069,7 @@ class EXAConf:
 
         for vol in volumes.iteritems():
             vol_sec = self.config["EXAVolume : " + vol[0]]
-            if "owner" in config.iterkeys():
+            if "owner" in iterkeys(config):
                 vol_sec["Owner"] = str(config.owner[0]) + " : " + str(config.owner[1])
 
         self.commit()
@@ -1088,7 +1089,7 @@ class EXAConf:
 
         for db in dbs.iteritems():
             db_sec = self.config["DB : " + db[0]]
-            if "owner" in config.iterkeys():
+            if "owner" in iterkeys(config):
                 db_sec["Owner"] = str(config.owner[0]) + " : " + str(config.owner[1])
 
         self.commit()
@@ -1101,7 +1102,7 @@ class EXAConf:
         """
 
         bfs_sec = self.config["BucketFS"]
-        if "service_owner" in config.iterkeys():
+        if "service_owner" in iterkeys(config):
             bfs_sec["ServiceOwner"] = str(config.service_owner[0]) + " : " + str(config.service_owner[1])
 
         self.commit()
@@ -1657,7 +1658,7 @@ class EXAConf:
             return configs
         for item in configs.items(): # use a copy!
             for f in filters.iteritems():
-                if f[0] in item[1].iterkeys() and f[1] != item[1][f[0]]:
+                if f[0] in iterkeys(item[1]) and f[1] != item[1][f[0]]:
                     del configs[item[0]]
                     break
         return configs

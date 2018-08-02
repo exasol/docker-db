@@ -1,4 +1,5 @@
 from . import rpc_handler, docker_handler
+from six import iterkeys
 
 class docker_rpc_handler(rpc_handler.rpc_handler):
     """
@@ -38,7 +39,7 @@ class docker_rpc_handler(rpc_handler.rpc_handler):
                 self.log("Could not find database '%s'!" % name)
             return False
         
-        for db in db_configs.iterkeys():
+        for db in iterkeys(db_configs):
             self.dh.execute("dwad_client stop-wait %s" % db, quiet=True)
         return True
 #}}}
@@ -61,7 +62,7 @@ class docker_rpc_handler(rpc_handler.rpc_handler):
                 self.log("Could not find database '%s'!" % name)
             return False
         
-        for db in db_configs.iterkeys():
+        for db in iterkeys(db_configs):
             self.dh.execute("dwad_client stop-force %s" % db, quiet=True)
         return True
 #}}}
@@ -84,7 +85,7 @@ class docker_rpc_handler(rpc_handler.rpc_handler):
                 self.log("Could not find database '%s'!" % name)
             return False
         
-        for db in db_configs.iterkeys():
+        for db in iterkeys(db_configs):
             self.dh.execute("dwad_client start-wait %s" % db, quiet=True)
         return True
 #}}}
