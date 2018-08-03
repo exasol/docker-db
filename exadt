@@ -8,7 +8,8 @@ from six import iteritems, iterkeys, itervalues
 from libexadt.EXAConf import config
 
 # Flush STDOUT continuously
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+if sys.version_info[0] < 3:
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
 my_version = "6.0.11"
 info_arc_prefix = "exasol_docker_info"
