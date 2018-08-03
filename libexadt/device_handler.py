@@ -1,5 +1,6 @@
 #! /usr/bin/env python2.7
 
+from __future__ import print_function
 import os, glob
 from . import EXAConf
 from .utils import bytes2units
@@ -129,7 +130,7 @@ class device_handler:
             part_free = self.get_free_space(mount_point)
             files_size = sum([os.path.getsize(os.path.realpath(dev)) for dev in mount_devices[mount_point]])
             if part_free < files_size:
-                print "Free space on '%s' is only %s, but accumulated size of (sparse) file-devices is %s!" % (mount_point, bytes2units(part_free), bytes2units(files_size))
+                print("Free space on '%s' is only %s, but accumulated size of (sparse) file-devices is %s!" % (mount_point, bytes2units(part_free), bytes2units(files_size)))
                 sufficient_free_space = False
         return sufficient_free_space
 #}}}

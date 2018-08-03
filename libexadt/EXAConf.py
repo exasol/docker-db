@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys, os, stat, ipaddr, configobj, hashlib, re
 from .utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
 from collections import OrderedDict as odict
@@ -221,7 +222,7 @@ class EXAConf:
             raise EXAConfError("The version of the EXAConf file '%s' is higher (%s) than that of the EXAConf module (%s)! Please update your installation!" % (self.conf_path, conf_version, self.version))
         # the EXAConf file is older than the EXAConf module -> update
         if diff == 1:
-            print "Updating EXAConf '%s' from version '%s' to '%s'" % (self.conf_path, conf_version, self.version)
+            print("Updating EXAConf '%s' from version '%s' to '%s'" % (self.conf_path, conf_version, self.version))
             # 6.0.1 : 
             # - "Hostname" renamed to "Name"
             # - Introduced "Host"
@@ -413,7 +414,7 @@ class EXAConf:
         """
         self.config.reset()
         self.config.write()
-        print "Cleared configuration in '%s'." % self.conf_path
+        print("Cleared configuration in '%s'." % self.conf_path)
 #}}}
 
 #{{{ Commit
@@ -509,7 +510,7 @@ class EXAConf:
         # check if EXAConf is already initialized
         if self.initialized():
             if not force and not quiet:
-                print "EXAConf file '%s' is already initialized!" % self.conf_path
+                print("EXAConf file '%s' is already initialized!" % self.conf_path)
                 return
             else:
                 self.clear_config()
@@ -701,7 +702,7 @@ class EXAConf:
 
         self.commit()
         if not quiet:
-            print "Successfully initialized configuration in '%s'." % self.conf_path
+            print("Successfully initialized configuration in '%s'." % self.conf_path)
 # }}}
  
 #{{{ Validate the configuration

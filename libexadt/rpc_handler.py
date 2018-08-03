@@ -1,3 +1,4 @@
+from __future__ import print_function
                               
 #{{{ Class RPCError
 class RPCError(Exception):
@@ -25,9 +26,9 @@ class rpc_handler:
     def log(self, msg, no_nl=False):
         if not self.quiet:
             if no_nl:
-                print msg,
+                print(msg, end=' ')
             else:
-                print msg
+                print(msg)
 #}}}
  
 #{{{ Stop database

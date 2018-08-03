@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os, docker, pprint, shutil
 from docker.utils import kwargs_from_env
 from . import device_handler, EXAConf
@@ -35,9 +36,9 @@ class docker_handler:
     def log(self, msg, no_nl=False):
         if not self.quiet:
             if no_nl:
-                print msg,
+                print(msg, end=' ')
             else:
-                print msg
+                print(msg)
 #}}}
 
 #{{{ Set EXAConf object for this instace of docker-handler
@@ -120,7 +121,7 @@ class docker_handler:
                 created_networks.append(net)
                 self.log("successful")
                 if self.verbose:
-                    print "Created the following network:"
+                    print("Created the following network:")
                     pprint.pprint(net)
             except docker.errors.APIError as e:
                 raise DockerError("Failed to create network: %s." % e)
@@ -148,7 +149,7 @@ class docker_handler:
                 created_networks.append(net)
                 self.log("successful")
                 if self.verbose:
-                    print "Created the following network:"
+                    print("Created the following network:")
                     pprint.pprint(net)
             except docker.errors.APIError as e:
                 raise DockerError("Failed to create network: %s." % e)
@@ -184,14 +185,14 @@ class docker_handler:
             err = False
             for net in nets:
                 if self.verbose:
-                    print "Going to remove the following network:"
+                    print("Going to remove the following network:")
                     pprint.pprint(net)
                 try:
                     self.log("Removing network '%s'..." % net['Name'], no_nl=True)
                     self.client.remove_network(net['Id'])
                     self.log("successful")
                 except docker.errors.APIError as e:
-                    print "Failed to remove network '%s' : %s" % (net['Name'], e)
+                    print("Failed to remove network '%s' : %s" % (net['Name'], e))
                     err = True
             if err:
                 raise DockerError("Failed to remove all networks!")
@@ -262,21 +263,21 @@ class docker_handler:
         try:
             nodes_conf = self.exaconf.get_nodes_conf()
             if self.verbose:
-                print "Found the following node configurations:"
+                print("Found the following node configurations:")
                 pprint.pprint(nodes_conf)
             docker_conf = self.exaconf.get_docker_conf()
             if self.verbose:
-                print "Found the following docker config:"
+                print("Found the following docker config:")
                 pprint.pprint(docker_conf)
             bucketfs_conf = self.exaconf.get_bucketfs_conf()
             if self.verbose:
-                print "Found the following BucketFS config:"
+                print("Found the following BucketFS config:")
                 pprint.pprint(bucketfs_conf)
         except EXAConf.EXAConfError as e:
             raise DockerError("Failed to read EXAConf: %s" % e)
 
         if self.verbose:
-            print "Using image '%s' and cluster name '%s'." % (self.image, self.cluster_name)
+            print("Using image '%s' and cluster name '%s'." % (self.image, self.cluster_name))
 
         if cmd and cmd != "":
             self.log("Using custom command '%s'." % cmd)
@@ -380,7 +381,7 @@ class docker_handler:
                 container['MyName'] = container_name
                 self.log("successful")
                 if self.verbose:
-                    print "Created the following container:"
+                    print("Created the following container:")
                     pprint.pprint(container)
             except docker.errors.ImageNotFound as e:
                 raise DockerError("Image '%s' not found: %s" % (self.image, e))
@@ -417,7 +418,7 @@ class docker_handler:
 
         for container in containers:
             if self.verbose:
-                print "Going to start the following container:"
+                print("Going to start the following container:")
                 pprint.pprint(container)
             try:
                 self.log("Starting container '%s'..." % container['MyName'], no_nl=True)
@@ -447,7 +448,7 @@ class docker_handler:
         err = False
         for container in containers:
             if self.verbose:
-                print "Found the following container:"
+                print("Found the following container:")
                 pprint.pprint(container)
             state = container['State']
             if state == 'running' or state == 'paused' or state == 'restarting':
@@ -458,7 +459,7 @@ class docker_handler:
                     num_stopped += 1
                     self.log("successful")
                 except docker.errors.APIError as e:
-                    print "Failed to stop container '%s': %s" % (self.container_name(container), e)
+                    print("Failed to stop container '%s': %s" % (self.container_name(container), e))
                     err = True
             else:
                 num_stopped += 1
@@ -468,7 +469,7 @@ class docker_handler:
         if num_running == 0:
             self.log("No running containers found for cluster '%s'." % self.cluster_name)
         elif self.verbose:
-            print "Successfully stopped %i containers." % num_running
+            print("Successfully stopped %i containers." % num_running)
 
         return num_stopped > 0
 #}}}
@@ -493,7 +494,7 @@ class docker_handler:
                     self.client.remove_container(container['Id'])
                     self.log("successful")
                 except docker.errors.APIError as e:
-                    print "Failed to remove container '%s': %s" % (self.container_name(container), e)
+                    print("Failed to remove container '%s': %s" % (self.container_name(container), e))
                     err = True
 
         if err:
@@ -601,14 +602,14 @@ class docker_handler:
                 if ssl_conf.has_key("cert_auth") and os.path.isfile(ssl_conf.cert_auth):
                     shutil.copy(ssl_conf.cert_auth, os.path.join(volume, self.exaconf.ssl_dir))
             except EXAConf.EXAConfError as e:
-                print "Skipping SSL configuration (not present in EXAConf)."
+                print("Skipping SSL configuration (not present in EXAConf).")
 
             # 4. create networks (if network mode is not "host")
             if docker_conf.network_mode != "host":
                 try:
                     networks = self.create_networks()
                 except DockerError as e:
-                    print "Error during startup! Cleaning up..."
+                    print("Error during startup! Cleaning up...")
                     self.stop_cluster(30)   
                     raise e
 
@@ -616,7 +617,7 @@ class docker_handler:
         try:
             containers = self.create_containers(networks, cmd=cmd, auto_remove=auto_remove)
         except DockerError as e:
-            print "Error during startup! Cleaning up..."
+            print("Error during startup! Cleaning up...")
             self.stop_cluster(30)            
             raise e
 
@@ -624,7 +625,7 @@ class docker_handler:
         try:
             self.start_containers(containers)
         except DockerError as e:
-            print "Error during startup! Cleaning up..."
+            print("Error during startup! Cleaning up...")
             self.stop_cluster(30)            
             raise e
 #}}}
@@ -641,7 +642,7 @@ class docker_handler:
         try:
             stopped = self.stop_containers(timeout)
         except Exception as e:
-            print "Error during shutdown: %s! Continueing anyway..." % e
+            print("Error during shutdown: %s! Continueing anyway..." % e)
             ex = e
         # save logs and merge EXAConf before removing containers
         self.save_logs()
@@ -650,7 +651,7 @@ class docker_handler:
             if stopped:
                 self.remove_containers()
         except DockerError as e:
-            print "Error during shutdown! Continueing anyway..."
+            print("Error during shutdown! Continueing anyway...")
             ex = e
         try:
             self.delete_networks()
@@ -677,9 +678,9 @@ class docker_handler:
                     with open(current_file, "w") as current_logs:
                         current_logs.write(logs)
                 except docker.errors.APIError as e:
-                    print "Failed to retrieve docker logs from container '%s' : %s" % (self.container_name(container), e)
+                    print("Failed to retrieve docker logs from container '%s' : %s" % (self.container_name(container), e))
                 except IOError as e:
-                    print "Failed to write docker logs to '%s': %s" % (current_file, e)
+                    print("Failed to write docker logs to '%s': %s" % (current_file, e))
 #}}}
  
 #{{{ Execute container

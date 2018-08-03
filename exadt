@@ -1,5 +1,5 @@
 #! /usr/bin/env python2.7
-
+from __future__ import print_function
 import sys, os, argparse, pprint, subprocess, time, tarfile, io, docker
 from libexadt import exadt_conf, docker_handler, device_handler, docker_rpc_handler, EXAConf, utils
 import shutil
@@ -66,7 +66,7 @@ def cluster_started(root):
     try:
         exaconf = EXAConf.EXAConf(root, False)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         # return False (necessary e. g. if the root-directory has already been deleted)
         return False
     # EXAConf may be un-inititalized if delete-cluster is
@@ -80,7 +80,7 @@ def cluster_started(root):
         dh.set_exaconf(exaconf)
         res = dh.cluster_started()
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
     return res
 #}}}
@@ -97,16 +97,16 @@ def create_cluster(cmd):
             os.makedirs(root)
         except OSError:
             if not os.path.isdir(root):
-                print "Failed to create root-directory '%s'!" % root
+                print("Failed to create root-directory '%s'!" % root)
                 raise
     elif not os.path.isdir(root):
-        print "Root directory '%s' does not exist (or is a file)!" % root
+        print("Root directory '%s' does not exist (or is a file)!" % root)
         sys.exit(1)
     # create entry in config
     try:
         conf.create_cluster(cmd.cluster, root)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}    
 
@@ -116,17 +116,17 @@ def delete_cluster(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # check if has been started (i. e. containers exist)
     if cluster_started(root):
-        print "Cluster '%s' has existing containers. It has to be stopped before it can be deleted!" % cmd.cluster
+        print("Cluster '%s' has existing containers. It has to be stopped before it can be deleted!" % cmd.cluster)
         sys.exit(1)
     # ask for confirmation
     msg = "Do you really want to delete cluster '%s'%s? " % \
             (cmd.cluster, " (and all file-devices)" if not (cmd.keep_root or cmd.keep_mapped_devices) else "")
     if not confirm(msg):
-        print "Aborted."
+        print("Aborted.")
         sys.exit(1)
 
     # check if cluster has been initialized (may be un-initialized 
@@ -136,7 +136,7 @@ def delete_cluster(cmd):
         exaconf = EXAConf.EXAConf(root, False)
         initialized = exaconf.initialized()
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         # interpret exception as "not initialized" and proceed
 
     # delete root-dir if not prevented
@@ -144,13 +144,13 @@ def delete_cluster(cmd):
     #         some of the files belong to root (due to the privileged mode) and can't  
     #         be deleted if exadt has been called by a normal user.
     if initialized and not cmd.keep_root:
-        print "Deleting root directory '%s'." % root
+        print("Deleting root directory '%s'." % root)
         try:
             dh = docker_handler.docker_handler(quiet=True)
             dh.set_exaconf(exaconf)
             dh.start_cluster(cmd = "rm -rf /exa", auto_remove=True, dummy_mode=True)
         except docker_handler.DockerError as e:
-            print "Errors occured while trying to delete the root directory: %s" % e
+            print("Errors occured while trying to delete the root directory: %s" % e)
         # delete the root-directory itself and the node directories
         shutil.rmtree(root, True)
     # un-initialized clusters have to be deleted without accessing EXAConf
@@ -159,7 +159,7 @@ def delete_cluster(cmd):
 
     # check if deletion was successfull (may fail if there are root-only files in an unitialized cluster)
     if os.path.isdir(root):
-        print "WARNING: root directory '%s' could not be completely deleted! Please delete it manually before reusing it." % root
+        print("WARNING: root directory '%s' could not be completely deleted! Please delete it manually before reusing it." % root)
  
     # delete mapped devices if not prevented
     # --> we delete the complete '$name' directories (they are created automatically)
@@ -171,7 +171,7 @@ def delete_cluster(cmd):
             exaconf.validate()
             nodes_conf = exaconf.get_nodes_conf()
         except EXAConf.EXAConfError as e:
-            print e
+            print(e)
         for node in itervalues(nodes_conf):
             for disk in itervalues(node.disks):
                 if disk.has_key("mapping"):
@@ -182,10 +182,10 @@ def delete_cluster(cmd):
                             # path can also be a file within '$name/'!
                             if os.path.isfile(path):
                                 path = os.path.dirname(path)
-                            print "Deleting directory '%s'." % path
+                            print("Deleting directory '%s'." % path)
                             shutil.rmtree(path, True)
                         except OSError as e:
-                            print "Failed to delete '%s': %s." % (path, e)
+                            print("Failed to delete '%s': %s." % (path, e))
 
     # delete entry from config
     conf.delete_cluster(cmd.cluster)
@@ -226,7 +226,7 @@ def extract_versions(cmd=None, env=None, image=None):
                 dh = docker_handler.docker_handler()
                 ic = dh.get_image_conf(image)
             except docker_handler.DockerError as e:
-                print e
+                print(e)
                 sys.exit(1)
             if not db_version:
                 db_version = ic.labels.dbversion
@@ -248,7 +248,7 @@ def get_versioned_image_name(image):
             dh = docker_handler.docker_handler()
             ic = dh.get_image_conf(image)
         except docker_handler.DockerError as e:
-            print e
+            print(e)
             sys.exit(1)
             image = image.split(":")[0] + ":" + ic.labels.version
     return image
@@ -260,25 +260,25 @@ def init_cluster(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # check if root and license actually exist
     if not os.path.isdir(root):
-        print "Root directory '%s' does not exist (or is a file)!" % root
+        print("Root directory '%s' does not exist (or is a file)!" % root)
         sys.exit(1)
     if not os.path.isfile(cmd.license):
-        print "License '%s' does not exist (or is a directory)!" % os.path.abspath(cmd.license)
+        print("License '%s' does not exist (or is a directory)!" % os.path.abspath(cmd.license))
         sys.exit(1)
     # check params
     if cmd.device_type and cmd.device_type not in ['block','file']:
-        print "Device-type must be 'block' or 'file'!" 
+        print("Device-type must be 'block' or 'file'!") 
         sys.exit(1)
     if cmd.auto_storage and cmd.device_type != 'file':
-        print "'--auto-storage' is only supported for device-type 'file'!"
+        print("'--auto-storage' is only supported for device-type 'file'!")
         sys.exit(1)
     # check if has been started (i. e. containers exist)
     if cluster_started(root):
-        print "Cluster '%s' has existing containers. It has to be stopped before it can be re-initialized!" % cmd.cluster
+        print("Cluster '%s' has existing containers. It has to be stopped before it can be re-initialized!" % cmd.cluster)
         sys.exit(1)
     # extract versions
     db_version, os_version, img_version = extract_versions(cmd=cmd,
@@ -294,13 +294,13 @@ def init_cluster(cmd):
                 else:
                     os.unlink(name)
         else:
-            print "Root directory '%s' is not empty! Use --force to force re-initialization." % root
+            print("Root directory '%s' is not empty! Use --force to force re-initialization." % root)
             sys.exit(1)
     # create EXAConf
     try:
         exaconf = EXAConf.EXAConf(root, False)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # create directory structure
     for node in range(1, cmd.num_nodes+1):
@@ -319,10 +319,10 @@ def init_cluster(cmd):
             devh = device_handler.device_handler(exaconf)
             devh.auto_create_file_devices()
         except device_handler.DeviceError as e:
-            print e
+            print(e)
             sys.exit(1)
 
-    print "Successfully initialized root directory '%s'." % root
+    print("Successfully initialized root directory '%s'." % root)
 #}}}
 
 #{{{ Init sc
@@ -365,7 +365,7 @@ def init_sc(cmd):
                                                os_version=os_version, 
                                                img_version = img_version)
         if c == True:
-            print "The given docker volume is not compatible with this docker image because of the following version mismatch(es):\n%sPlease update the volume (using 'update-sc')!" % (res)
+            print("The given docker volume is not compatible with this docker image because of the following version mismatch(es):\n%sPlease update the volume (using 'update-sc')!" % (res))
             sys.exit(1)
  
     # 5. Create all other directories if they don't exist
@@ -535,7 +535,7 @@ def list_clusters(cmd):
     conf = exadt_conf.exadt_conf()
     clusters = conf.get_clusters()
     if len(clusters) == 0:
-        print "No clusters found in %s." % conf.get_conf_paths()
+        print("No clusters found in %s." % conf.get_conf_paths())
         sys.exit(0)
 
     # build dict containg all information
@@ -562,7 +562,7 @@ def list_clusters(cmd):
                 ci.db_version = ic.labels.dbversion
                 ci.os_version = ic.labels.osversion
             except docker_handler.DockerError as e:
-                print e
+                print(e)
         clusters_info[cluster] = ci
         # update column widths
         width[0] = max(width[0], len(cluster))
@@ -572,32 +572,32 @@ def list_clusters(cmd):
         width[4] = max(width[4], len(ci.db_version))
         width[5] = max(width[5], len(ci.os_version))
                 
-    print " %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], "CLUSTER", 
+    print(" %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], "CLUSTER", 
                                                               width[1], "ROOT", 
                                                               width[2], "IMAGE NAME", 
                                                               width[3], "IMAGE VERSION", 
                                                               width[4], "DB VERSION", 
-                                                              width[5], "OS VERSION")
+                                                              width[5], "OS VERSION"))
     for cluster,ci in iteritems(clusters_info):
-        print " %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], cluster,
+        print(" %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], cluster,
                                                                   width[1], ci.root,
                                                                   width[2], ci.image,
                                                                   width[3], ci.version,
                                                                   width[4], ci.db_version,
-                                                                  width[5], ci.os_version)
+                                                                  width[5], ci.os_version))
 #}}}
 
 #{{{ Docker version
 def docker_version(cmd):
     try:
         dh = docker_handler.docker_handler(verbose=True)
-        print "====== Docker Version ======"
+        print("====== Docker Version ======")
         pp = pprint.PrettyPrinter()
         pp.pprint(dh.version())
-        print "====== Docker-py Version ======"
-        print docker.version
+        print("====== Docker-py Version ======")
+        print(docker.version)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
 
@@ -607,7 +607,7 @@ def start_cluster(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
@@ -616,15 +616,15 @@ def start_cluster(cmd):
         # still have to work, especially the update)
         (c, ev, iv) = exaconf.check_img_compat()
         if c == False:
-            print "EXAConf version (%s) is not compatible with image version (%s). Please update your installation!" % (ev, iv)
+            print("EXAConf version (%s) is not compatible with image version (%s). Please update your installation!" % (ev, iv))
             sys.exit(1)
         # check if the volumes all have disks assigned
         for name,vol in iteritems(exaconf.get_storage_volumes()):
             if vol.disk is None:
-                print "Volume '%s' has no disk! Aborting cluster startup." % name
+                print("Volume '%s' has no disk! Aborting cluster startup." % name)
                 sys.exit(1)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # call docker handler
     try:
@@ -632,7 +632,7 @@ def start_cluster(cmd):
         dh.set_exaconf(exaconf)
         dh.start_cluster(cmd = cmd.command)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
 
@@ -642,24 +642,24 @@ def stop_cluster(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         dh = docker_handler.docker_handler(verbose=cmd.verbose)
         dh.set_exaconf(exaconf)
         if dh.cluster_online():
             drh = docker_rpc_handler.docker_rpc_handler(exaconf, quiet=True)
-            print "Stopping database(s)...",
+            print("Stopping database(s)...", end=' ')
             drh.stop_database()
-            print "successful"
+            print("successful")
         dh.stop_cluster(cmd.timeout)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
 
@@ -669,11 +669,11 @@ def update_cluster(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # check if has been started (i. e. containers exist)
     if cluster_started(root):
-        print "Cluster '%s' has existing containers. It has to be stopped before it can be updated!" % cmd.cluster
+        print("Cluster '%s' has existing containers. It has to be stopped before it can be updated!" % cmd.cluster)
         sys.exit(1)
     # extract new versions
     new_db_version, new_os_version, new_img_version = extract_versions(cmd=cmd,
@@ -691,19 +691,19 @@ def update_cluster(cmd):
         exaconf.update_img_version(new_img_version)
         nodes_conf = exaconf.get_nodes_conf()
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # create missing directories
     for node_conf in itervalues(nodes_conf):
         create_node_dirs(node_conf.docker_volume, exaconf)
     # print update info
     col_width = len(old_docker_image)
-    print "Cluster '%s' has been successfully updated!" % cmd.cluster
-    print "- Image name :  %-*s --> %s" % (col_width, old_docker_image, exaconf.get_docker_image())
-    print "- Image ver. :  %-*s --> %s" % (col_width, old_img_version, exaconf.get_img_version())
-    print "- DB ver.    :  %-*s --> %s" % (col_width, old_db_version, exaconf.get_db_version())
-    print "- OS ver.    :  %-*s --> %s" % (col_width, old_os_version, exaconf.get_os_version())
-    print "Restart the cluster in order to apply the changes." 
+    print("Cluster '%s' has been successfully updated!" % cmd.cluster)
+    print("- Image name :  %-*s --> %s" % (col_width, old_docker_image, exaconf.get_docker_image()))
+    print("- Image ver. :  %-*s --> %s" % (col_width, old_img_version, exaconf.get_img_version()))
+    print("- DB ver.    :  %-*s --> %s" % (col_width, old_db_version, exaconf.get_db_version()))
+    print("- OS ver.    :  %-*s --> %s" % (col_width, old_os_version, exaconf.get_os_version()))
+    print("Restart the cluster in order to apply the changes.") 
 #}}}
 
 #{{{ Update sc
@@ -724,13 +724,13 @@ def update_sc(cmd):
         exaconf.update_os_version(new_os_version)
         exaconf.update_img_version(new_img_version)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1) 
     col_width = len(old_img_version)
-    print "Container has been successfully updated!"
-    print "- Image ver. :  %-*s --> %s" % (col_width, old_img_version, exaconf.get_img_version())
-    print "- DB ver.    :  %-*s --> %s" % (col_width, old_db_version, exaconf.get_db_version())
-    print "- OS ver.    :  %-*s --> %s" % (col_width, old_os_version, exaconf.get_os_version())
+    print("Container has been successfully updated!")
+    print("- Image ver. :  %-*s --> %s" % (col_width, old_img_version, exaconf.get_img_version()))
+    print("- DB ver.    :  %-*s --> %s" % (col_width, old_db_version, exaconf.get_db_version()))
+    print("- OS ver.    :  %-*s --> %s" % (col_width, old_os_version, exaconf.get_os_version()))
 #}}}
 
 #{{{ ps
@@ -739,23 +739,23 @@ def ps(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         dh = docker_handler.docker_handler()
         dh.set_exaconf(exaconf)
         containers = dh.get_containers()
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
     # not running?
     if len(containers) == 0:
-        print "No containers found for cluster '%s'." % cmd.cluster
+        print("No containers found for cluster '%s'." % cmd.cluster)
         sys.exit(0)
     # verbose output    
     if cmd.verbose:
@@ -776,23 +776,23 @@ def ps(cmd):
             width[6] = len(ports_str)
     width[6] = max(width[6], len("EXPOSED PORTS"))
 
-    print " %- *s   %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], "NODE ID", 
+    print(" %- *s   %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], "NODE ID", 
                                                                       width[1], "STATUS", 
                                                                       width[2], "IMAGE VERSION", 
                                                                       width[3], "NAME", 
                                                                       width[4], "CONTAINER ID", 
                                                                       width[5], "CONTAINER NAME", 
-                                                                      width[6], "EXPOSED PORTS")
+                                                                      width[6], "EXPOSED PORTS"))
     for c in containers:
         ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if d.has_key('PublicPort') ]
         ports_str = ",".join([str(p[0]) + "->" + str(p[1]) for p in ports])
-        print " %- *s   %- *s   %- *s   %- *s   %- .*s   %- *s   %- *s" % (width[0], c['Labels']['NodeID'], 
+        print(" %- *s   %- *s   %- *s   %- *s   %- .*s   %- *s   %- *s" % (width[0], c['Labels']['NodeID'], 
                                                                            width[1], c['Status'], 
                                                                            width[2], c['Labels']['version'],
                                                                            width[3], c['Labels']['Name'],
                                                                            width[4], c['Id'], 
                                                                            width[5], c['Names'][0].lstrip("/"),
-                                                                           width[6], ports_str) 
+                                                                           width[6], ports_str)) 
 #}}}
 
 #{{{ Create file devices
@@ -801,41 +801,41 @@ def create_file_devices(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1) 
     try:
         byte_size = utils.units2bytes(cmd.size)
     except RuntimeError as e:
-        print "ERROR:: %s" % e 
+        print("ERROR:: %s" % e) 
         sys.exit(1)
     # check if path does exist (do NOT create it)
     if cmd.path and not os.path.exists(cmd.path):
-        print "ERROR:: Given path '%s' does not exist!" % cmd.path
+        print("ERROR:: Given path '%s' does not exist!" % cmd.path)
         sys.exit(1)
     # ask user for confirmation if existing devices should be replaced
     if cmd.replace and not confirm("Do you really want to replace all file-devices of cluster '%s'?" % cmd.cluster):
-        print "Aborted"
+        print("Aborted")
         sys.exit(0)
     try:
         devh = device_handler.device_handler(exaconf)
         devices = devh.create_file_devices(cmd.disk, cmd.num, byte_size, cmd.path, cmd.replace)
     except device_handler.DeviceError as e:
-        print e
+        print(e)
         sys.exit(1)
     if devices:
         if len(devices[1]) > 0:
-            print "The following file devices have been removed:"
+            print("The following file devices have been removed:")
             for nid in devices[1].keys():
-                print "Node %s : %s" % (nid, devices[1][nid])
+                print("Node %s : %s" % (nid, devices[1][nid]))
         if len(devices[0]) > 0:
-            print "Successfully created the following file devices:"
+            print("Successfully created the following file devices:")
             for nid in devices[0].keys():
-                print "Node %s : %s" % (nid, devices[0][nid])
+                print("Node %s : %s" % (nid, devices[0][nid]))
 #}}}
 
  #{{{ execute
@@ -844,19 +844,19 @@ def execute(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         dh = docker_handler.docker_handler()
         dh.set_exaconf(exaconf)
         dh.execute(cmd.command, all=cmd.all, quiet=cmd.quiet)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
  
@@ -866,12 +866,12 @@ def stop_database(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         drh = docker_rpc_handler.docker_rpc_handler(exaconf)
@@ -880,7 +880,7 @@ def stop_database(cmd):
         else:
             drh.stop_database(cmd.name)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
   
@@ -890,18 +890,18 @@ def start_database(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         drh = docker_rpc_handler.docker_rpc_handler(exaconf)
         drh.start_database(cmd.name)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
    
@@ -911,24 +911,24 @@ def list_databases(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         exaconf = EXAConf.EXAConf(root, True)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     try:
         drh = docker_rpc_handler.docker_rpc_handler(exaconf)
         drh.list_databases(short=cmd.short)
     except docker_handler.DockerError as e:
-        print e
+        print(e)
         sys.exit(1)
 #}}}
  
 #{{{ Print version
 def print_version(cmd):
-    print my_version
+    print(my_version)
 #}}}
 
 #{{{ Collect info
@@ -950,7 +950,7 @@ def collect_info(cmd):
         conf = exadt_conf.exadt_conf()
         root = conf.get_root(cmd.cluster)
     except exadt_conf.ConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # determine exadt version and MD5 sum
     script = get_script_path()
@@ -961,20 +961,20 @@ def collect_info(cmd):
         pp = pprint.PrettyPrinter()
         docker_info = pp.pformat(dh.version())
     except Exception as e:
-        print e
+        print(e)
         err = True
     # parse EXAConf
     try:
         exaconf = EXAConf.EXAConf(root, False)
     except EXAConf.EXAConfError as e:
-        print e
+        print(e)
         sys.exit(1)
     # EXAConf may be un-inititalized 
     image_info = None
     container_info = None
     initialized = False
     if not exaconf.initialized():
-        print "Cluster '%s' has not been initialized." % cmd.cluster
+        print("Cluster '%s' has not been initialized." % cmd.cluster)
     else:
         initialized = True
         dh.set_exaconf(exaconf)
@@ -982,19 +982,19 @@ def collect_info(cmd):
         try:
             image_info = pprint.pformat(dh.inspect_image(exaconf.get_docker_image()))
         except Exception as e:
-            print e
+            print(e)
             err = True
         # collect container information
         try:
             container_info = pprint.pformat(dh.inspect_containers())
         except Exception as e:
-            print e
+            print(e)
             err = True
         # save docker logs
         try:
             dh.save_logs()
         except Exception as e:
-            print e
+            print(e)
             err = True
 
     # create archive
@@ -1031,7 +1031,7 @@ def collect_info(cmd):
                     tar.add(os.path.join(conf.docker_volume, "logs"), 
                             arcname = os.path.join(info_arc_prefix, "n" + str(nid), "logs"))
                 except Exception as e:
-                    print e
+                    print(e)
                     err = True
                 # etc
                 # -> contains root-only-readable files, so we do it manually
@@ -1059,7 +1059,7 @@ def collect_info(cmd):
                             pass
         tar.close()
  
-    print "All available information has been saved to '%s'.%s" % (cmd.outfile, "Some information could not be retrieved!" if err else "")
+    print("All available information has been saved to '%s'.%s" % (cmd.outfile, "Some information could not be retrieved!" if err else ""))
 #}}}
 
 # {{{ Main

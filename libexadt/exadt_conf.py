@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 try:
     from configparser import SafeConfigParser
@@ -48,7 +49,7 @@ class exadt_conf:
         """
         for section in self.config.sections():
             if self.config.get(section, "root") == root:
-                print "Root directory '%s' is already used by cluster '%s'." % (root, self.extract_name(section))
+                print("Root directory '%s' is already used by cluster '%s'." % (root, self.extract_name(section)))
                 return True
         return False
 #}}}
@@ -95,7 +96,7 @@ class exadt_conf:
             for cp in self.conf_paths:
                 with open(cp, 'w') as conf_file:
                     self.config.write(conf_file)
-            print "Successfully created cluster '%s' with root directory '%s'." % (name, root)
+            print("Successfully created cluster '%s' with root directory '%s'." % (name, root))
 #}}}
  
 #{{{ Delete cluster
@@ -109,7 +110,7 @@ class exadt_conf:
             for cp in self.conf_paths:
                 with open(cp, 'w') as conf_file:
                     self.config.write(conf_file)
-            print "Successfully removed cluster '%s'." % name
+            print("Successfully removed cluster '%s'." % name)
         else:
             raise ConfError("Cluster '%s' does not exist!")
 #}}}
