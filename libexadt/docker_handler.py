@@ -1,8 +1,8 @@
-import os,docker,pprint,shutil,device_handler
+import os, docker, pprint, shutil
 from docker.utils import kwargs_from_env
-import EXAConf
-from utils import rotate_file
-from EXAConf import config
+from . import device_handler, EXAConf
+from .utils import rotate_file
+from .EXAConf import config
 
 ip_types = { 4: 'ipv4_address', 6: 'ipv6_address' }
  

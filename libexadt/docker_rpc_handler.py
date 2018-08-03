@@ -1,4 +1,4 @@
-import rpc_handler, docker_handler
+from . import rpc_handler, docker_handler
 
 class docker_rpc_handler(rpc_handler.rpc_handler):
     """

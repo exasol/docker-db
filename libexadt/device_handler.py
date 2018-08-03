@@ -1,8 +1,8 @@
 #! /usr/bin/env python2.7
 
 import os, glob
-import EXAConf
-from utils import bytes2units
+from . import EXAConf
+from .utils import bytes2units
 from collections import OrderedDict as odict
 
 #{{{ Class DeviceError

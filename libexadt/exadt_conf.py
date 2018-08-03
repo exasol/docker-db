@@ -1,5 +1,5 @@
 import os, ConfigParser
-from EXAConf import config
+from .EXAConf import config
  
 #{{{ Class ConfError
 class ConfError(Exception):

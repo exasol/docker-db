@@ -1,5 +1,5 @@
 import sys, os, stat, ipaddr, configobj, StringIO, hashlib, re
-from utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
+from .utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
 from collections import OrderedDict as odict
 
 #{{{ Class EXAConfError
