@@ -1,5 +1,9 @@
 from __future__ import print_function
-import sys, os, stat, ipaddr, configobj, hashlib, re
+try:
+    import ipaddress
+except:
+    from . import ipaddress
+import sys, os, stat, configobj, hashlib, re
 from .utils import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid
 from collections import OrderedDict as odict
 from six import iteritems, iterkeys, StringIO
@@ -845,7 +849,7 @@ class EXAConf:
         Returns true if the given string is a valid IP address (v4 or v6).
         """
         try:
-            ipaddr.IPAddress(ip)
+            ipaddress.ip_address(ip)
             return True
         except ValueError:
             return False
@@ -857,7 +861,7 @@ class EXAConf:
         Returns true if the given string is a valid IP network (v4 or v6).
         """
         try:
-            ipaddr.IPNetwork(net)
+            ipaddress.ip_network(net)
             return True
         except ValueError:
             return False
@@ -870,13 +874,13 @@ class EXAConf:
         a valid IPv6 address. Returns 0 if neither.
         """
         try:
-            ipaddr.IPv4Address(ip)
+            ipaddress.IPv4Address(ip)
             return 4
-        except ipaddr.AddressValueError: pass
+        except ipaddress.AddressValueError: pass
         try:
-            ipaddr.IPv6Address(ip)
+            ipaddress.IPv6Address(ip)
             return 6
-        except ipaddr.AddressValueError: pass
+        except ipaddress.AddressValueError: pass
         return 0
 #}}}            
  
@@ -1313,10 +1317,10 @@ class EXAConf:
 
                 # first node : choose the private net as the cluster network (and make it a 'real' network)
                 if network == "":
-                    subnet = ipaddr.IPNetwork(node_network)
-                    network = "%s/%s" % (str(subnet.network), str(subnet.prefixlen))
+                    subnet = ipaddress.ip_network(node_network)
+                    network = "%s/%s" % (str(subnet.network), str(subnet.with_prefixlen))
                 # other nodes : check if their IP is part of the chosen net
-                elif ipaddr.IPAddress(node_ip) not in ipaddr.IPNetwork(network):
+                elif ipaddress.ip_address(node_ip) not in ipaddress.ip_network(network):
                     raise EXAConfError("IP %s is not part of network %s!" % (node_ip, network))
 
         return network
