@@ -32,7 +32,7 @@ class config(odict):
         odict.__init__(self, *args, **kw)
         self.__enabled = True
     def __repr__(self):
-        return "<%s at %s: %s>" % (self.__class__.__name__, hex(id(self)), repr(self.items()))
+        return "<%s at %s: %s>" % (self.__class__.__name__, hex(id(self)), repr(list(self.items())))
     def __getattr__(self, name):
         if not self.__enabled:
             return self.__getattribute__(name)
@@ -587,7 +587,7 @@ class EXAConf:
         self.config["EXAVolume : DataVolume1"] = {}
         data_vol_sec = self.config["EXAVolume : DataVolume1"]
         data_vol_sec["Type"] = "data"
-        data_vol_sec["Nodes"] = [ str(n) for n in self.get_nodes_conf().keys() ] # list is correctly converted by ConfigObj
+        data_vol_sec["Nodes"] = [ str(n) for n in list(self.get_nodes_conf().keys()) ] # list is correctly converted by ConfigObj
         if template_mode:
             data_vol_sec["Disk"] = "default"
         else:
@@ -610,7 +610,7 @@ class EXAConf:
             self.config["EXAVolume : ArchiveVolume1"] = {}
             archive_vol_sec = self.config["EXAVolume : ArchiveVolume1"]
             archive_vol_sec["Type"] = "archive"
-            archive_vol_sec["Nodes"] = [ str(n) for n in self.get_nodes_conf().keys() ] # list is correctly converted by ConfigObj
+            archive_vol_sec["Nodes"] = [ str(n) for n in list(self.get_nodes_conf().keys()) ] # list is correctly converted by ConfigObj
             if template_mode:
                 archive_vol_sec["Disk"] = "default"
             else:
@@ -998,11 +998,11 @@ class EXAConf:
 
         nodes = self.get_nodes_conf()
         # add node first if it doesn't exist
-        if node_id not in nodes.keys():
+        if node_id not in list(nodes.keys()):
             self.add_node(nide = node_id, priv_net = node_conf.private_net, commit = False)
             nodes = self.get_nodes_conf()
         # change configuration for the given node(s)
-        for node in nodes.items():
+        for node in list(nodes.items()):
             if node_id == "all" or node[0] == node_id:
                 node_sec = self.config["Node : " + str(node[0])]
                 if "name" in node_conf.keys():
@@ -1036,11 +1036,11 @@ class EXAConf:
                 # a.) delete disks that don't exist in the node_conf
                 if remove_disks is True:
                     for sect in tuple(node_sec.sections):
-                        if self.is_disk(sect) and self.get_section_id(sect) not in node_conf.disks.keys():
+                        if self.is_disk(sect) and self.get_section_id(sect) not in list(node_conf.disks.keys()):
                             del node_sec[sect]
                 # b.) update / add disks
                 if "disks" in node_conf.keys():
-                    for name, disk in node_conf.disks.items():
+                    for name, disk in list(node_conf.disks.items()):
                         disk_sec = odict()
                         if name in node_sec.sections:
                             disk_sec = node_sec[name]
@@ -1124,7 +1124,7 @@ class EXAConf:
                 nid = self.get_section_id(section)
                 for exaconf in exaconf_list:
                     other_nodes = exaconf.get_nodes_conf()
-                    if nid in other_nodes.keys():
+                    if nid in list(other_nodes.keys()):
                         other_node = other_nodes[nid]
                         # a.) copy UUID from other node
                         if node_sec["UUID"] == "IMPORT" and other_node.uuid != "IMPORT":
@@ -1567,12 +1567,12 @@ class EXAConf:
         config.dbs = []
         # check volumes
         volumes = self.get_storage_volumes()
-        for v in volumes.values():
+        for v in list(volumes.values()):
             if nid in v.nodes:
                 result.volumes.append(v.name)
         # check DBs
         dbs = self.get_databases()
-        for db in dbs.values():
+        for db in list(dbs.values()):
             if nid in db.nodes:
                 result.dbs.append(db.name)
 
@@ -1656,7 +1656,7 @@ class EXAConf:
         """
         if not filters:
             return configs
-        for item in configs.items(): # use a copy!
+        for item in list(configs.items()): # use a copy!
             for f in iteritems(filters):
                 if f[0] in iterkeys(item[1]) and f[1] != item[1][f[0]]:
                     del configs[item[0]]
@@ -1675,11 +1675,11 @@ class EXAConf:
         """
 
         nodes_conf = self.get_nodes_conf()
-        if str(node_id) not in nodes_conf.keys():
+        if str(node_id) not in list(nodes_conf.keys()):
             raise EXAConfError("Node %s does not exist in '%s'." % (node_id, self.conf_path))
         node_conf = nodes_conf[str(node_id)]
-        if "disks" in node_conf.keys():
-            if disk in node_conf.disks.keys():
+        if "disks" in list(node_conf.keys()):
+            if disk in list(node_conf.disks.keys()):
                 raise EXAConfError("Node %s alrady contains disk '%s'." % (str(node_id), disk))
             else:
                 node_conf.disks[disk] = config()
@@ -1696,10 +1696,10 @@ class EXAConf:
         """
 
         nodes_conf = self.get_nodes_conf()
-        if str(node_id) not in nodes_conf.keys():
+        if str(node_id) not in list(nodes_conf.keys()):
             raise EXAConfError("Node %s does not exist in '%s'." % (node_id, self.conf_path))
         node_conf = nodes_conf[str(node_id)]
-        if "disks" in node_conf.keys():
+        if "disks" in list(node_conf.keys()):
             if disk == "all":
                 node_conf.disks.clear()
             else:
@@ -1719,20 +1719,20 @@ class EXAConf:
         """
 
         nodes_conf = self.get_nodes_conf()
-        if str(node_id) not in nodes_conf.keys():
+        if str(node_id) not in list(nodes_conf.keys()):
             raise EXAConfError("Node %s does not exist in '%s'." % (node_id, self.conf_path))
         node_conf = nodes_conf[str(node_id)]
         # get / create disk(s) entry
         node_disks = config()
-        if "disks" in node_conf.keys():
+        if "disks" in list(node_conf.keys()):
             node_disks = node_conf.disks
-        if disk not in node_disks.keys():
+        if disk not in list(node_disks.keys()):
             node_disks[disk] = config()
             node_disks[disk].devices = []
         # add devices
         node_disks[disk].devices.append((device+self.data_dev_suffix, device+self.meta_dev_suffix))
         if path and path != "":
-            if "mapping" not in node_disks[disk].keys():
+            if "mapping" not in list(node_disks[disk].keys()):
                 node_disks[disk].mapping = []
             node_disks[disk].mapping.append((device,path))
         
@@ -1747,22 +1747,22 @@ class EXAConf:
         """
       
         nodes_conf = self.get_nodes_conf()
-        if str(node_id) not in nodes_conf.keys():
+        if str(node_id) not in list(nodes_conf.keys()):
             raise EXAConfError("Node %s does not exist in '%s'." % (node_id, self.conf_path))
         node_conf = nodes_conf[str(node_id)]
-        if "disks" not in node_conf.keys():
+        if "disks" not in list(node_conf.keys()):
             raise EXAConfError("Node %s does not have any disks." % node_id)
         node_disks = node_conf.disks
-        if disk not in node_disks.keys():
+        if disk not in list(node_disks.keys()):
             raise EXAConfError("Node %s does not have a disk named '%s'." % (node_id, disk))
-        if "devices" not in node_disks[disk].keys():
+        if "devices" not in list(node_disks[disk].keys()):
             raise EXAConfError("Disk '%s' of node %s does not have any devices." % (disk, node_id))
         # delete device
         node_disks[disk].devices = [ d for d in node_disks[disk].devices if d[0] != str(device + self.data_dev_suffix) ]
         if len(node_disks[disk].devices) == 0:
             del node_disks[disk]["devices"]
         # delete mapping
-        if "mapping" in node_disks[disk].keys():
+        if "mapping" in list(node_disks[disk].keys()):
             node_disks[disk].mapping = [ m for m in node_disks[disk].mapping if m[0] != device ]
             if len(node_disks[disk].mapping) == 0:
                 del node_disks[disk]["mapping"]

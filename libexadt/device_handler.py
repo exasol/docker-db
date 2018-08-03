@@ -103,7 +103,7 @@ class device_handler:
             raise DeviceError("Space-check is only supported for file-devices!")
 
         # extract all file-devices from the given EXAConf
-        for node_id in nodes_conf.keys():
+        for node_id in list(nodes_conf.keys()):
             my_conf = nodes_conf[node_id]
             # add mapped devices (they have absolute paths)
             for disk in itervalues(my_conf.disks):
@@ -125,7 +125,7 @@ class device_handler:
             mount_devices[mount_point].append(dev)
         # compute free space for each mountpoint
         sufficient_free_space = True
-        for mount_point in mount_devices.keys():
+        for mount_point in list(mount_devices.keys()):
             part_free = self.get_free_space(mount_point)
             files_size = sum([os.path.getsize(os.path.realpath(dev)) for dev in mount_devices[mount_point]])
             if part_free < files_size:
@@ -317,7 +317,7 @@ class device_handler:
         disk = disk.strip()
         created_devices = odict()
         deleted_devices = odict()
-        for node_id in nodes_conf.keys():
+        for node_id in list(nodes_conf.keys()):
             # create sub-directory for current node in case a path is given 
             node_path = ""
             if path and path.strip() != "":
@@ -367,7 +367,7 @@ class device_handler:
             raise DeviceError("Failed to read EXAConf: %s" % e)
 
         # check if the nodes already have disks
-        for node in nodes_conf.values():
+        for node in list(nodes_conf.values()):
             if len(node.disks) > 0:
                 raise DeviceError("Devices can't be auto-generated because this cluster alreay has disks!") 
         

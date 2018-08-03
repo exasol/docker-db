@@ -291,7 +291,7 @@ class docker_handler:
         if networks and len(networks) > 0:
             first_net = networks.pop(0)
         # create containers for all nodes
-        for node_id in nodes_conf.keys():
+        for node_id in list(nodes_conf.keys()):
             container_name = self.cluster_name + "_" + str(node_id)
             my_conf = nodes_conf[node_id]
             devices = []
@@ -321,7 +321,7 @@ class docker_handler:
                         devices.append(dev_host+":"+dev_container+":rwm")
                         devices.append(meta_host+":"+meta_container+":rwm")
             # d. BucketFS volumes
-            for bfs_name in bucketfs_conf.fs.keys():
+            for bfs_name in list(bucketfs_conf.fs.keys()):
                 bfs_conf = bucketfs_conf.fs[bfs_name]
                 if bfs_conf.has_key("path") and bfs_conf.path != "":
                     bfs_host = os.path.join(bfs_conf.path, my_conf.name, bfs_name)
@@ -373,7 +373,7 @@ class docker_handler:
                                                          volumes = volumes,
                                                          host_config = hc,
                                                          networking_config = net_conf,
-                                                         ports = port_binds.keys(),
+                                                         ports = list(port_binds.keys()),
                                                          entrypoint = cmd)
                 created_containers.append(container)
                 # add name (not part of the returned dict)

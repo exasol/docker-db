@@ -541,7 +541,7 @@ def list_clusters(cmd):
     # build dict containg all information
     width = [len("CLUSTER"), len("ROOT"), len("IMAGE NAME"), len("IMAGE VERSION"), len("DB VERSION"), len("OS VERSION")]
     clusters_info = config()
-    for cluster,root in clusters.items():
+    for cluster,root in list(clusters.items()):
         ci = config({"root" : os.path.normpath(root),
                      "image" : "<uninitialized>",
                      "version" : "<unknown>",
