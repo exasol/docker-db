@@ -1,4 +1,8 @@
-import os, ConfigParser
+import os
+try:
+    from configparser import SafeConfigParser
+except ImportError:
+    from ConfigParser import SafeConfigParser
 from .EXAConf import config
  
 #{{{ Class ConfError
@@ -21,7 +25,7 @@ class exadt_conf:
         Creates a new exadt_conf containing the content of all available exadt configuration files
         (i. e. $HOME/.exadt.conf and /etc/exadt.conf)
         """
-        self.config = ConfigParser.SafeConfigParser()
+        self.config = SafeConfigParser()
         # make it case-sensitive
         self.config.optionxform = str
         # try all valid configuration files
