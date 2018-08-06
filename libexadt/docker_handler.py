@@ -22,7 +22,11 @@ class docker_handler:
         """
         Creates a new docker_handler and a docker.APIClient (used for communication with the docker service).
         """
-        self.client = docker.APIClient(timeout=120, **kwargs_from_env())
+        try:
+            self.client = docker.APIClient(timeout=120, **kwargs_from_env())
+        except AttributeError:
+            self.client = docker.Client(timeout=120, **kwargs_from_env())
+
         self.verbose = verbose
         self.quiet = quiet
         if self.quiet:
