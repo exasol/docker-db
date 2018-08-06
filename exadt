@@ -1413,7 +1413,11 @@ def main():
 
     command = parser.parse_args()
     if command.yes: confirm_yes = True
-    command.func(command)
+    if hasattr(command, "func"):
+        command.func(command)
+    else:
+        parser.print_help()
+
 
 if __name__ == '__main__':
     main()
