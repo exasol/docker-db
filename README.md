@@ -97,7 +97,7 @@ See [https://docs.docker.com/config/containers/resource_constraints/](https://do
 
 # Creating a stand-alone Exasol container
 
-Starting with version 6.0.2-d1, there is no more separate "self-contained" image version. You can simply create an Exasol container from the Exasol docker image using the following command:
+You can create an Exasol container from the Exasol docker image using the following command:
 
 ```console
 $ docker run --name exasoldb -p 127.0.0.1:9563:8563 --detach --privileged --stop-timeout 120  exasol/docker-db:<version>
@@ -131,7 +131,7 @@ $ docker exec -ti exasoldb dwad_client stop-wait DB1
 
 ## Updating the persistent volume of a stand-alone Exasol container
 
-Starting with version 6.0.3-d1, an existing persistent volume can be updated (for use with a later version of an Exasol image) by calling the following command with the *new* image:
+An existing persistent volume can be updated (for use with a later version of an Exasol image) by calling the following command with the *new* image:
 
 ```console
 $ docker run --rm -v exa_volume:/exa exasol/docker-db:<new version> update-sc
@@ -140,11 +140,11 @@ $ docker run --rm -v exa_volume:/exa exasol/docker-db:<new version> update-sc
 If everything works correctly, you should see output similar to this:
 
 ```console
-Updating EXAConf '/exa/etc/EXAConf' from version '6.0.2' to '6.0.3'
+Updating EXAConf '/exa/etc/EXAConf' from version '7.0.2' to '7.0.3'
 Container has been successfully updated!
-- Image ver. :  6.0.2-d1 --> 6.0.3-d1
-- DB ver.    :  6.0.2 --> 6.0.3
-- OS ver.    :  6.0.2 --> 6.0.3
+- Image ver. :  7.0.2 --> 7.0.3
+- DB ver.    :  7.0.2 --> 7.0.3
+- OS ver.    :  7.0.2 --> 7.0.3
 ```
 
 After that, a new container can be created (from the new image) using the old / updated volume.
@@ -315,7 +315,7 @@ Similar to adding devices, you can either manually edit EXAConf:
 ```
 or use the `exaconf` CLI tool from the Exasol image:
 ```console
-docker run --rm -v $CONTAINER_EXA:/exa exasol/docker-dev-6.1.2:juk exaconf add-node-disk -D disk2 -n 11
+docker run --rm -v $CONTAINER_EXA:/exa exasol/docker-dev-7.0.0:juk exaconf add-node-disk -D disk2 -n 11
 docker run --rm -v $CONTAINER_EXA:/exa exasol/docker-db:<version> exaconf add-node-device -D disk2 -d dev.3 -n 11
 docker run --rm -v $CONTAINER_EXA:/exa exasol/docker-db:<version> exaconf add-node-device -D disk2 -d dev.4 -n 11
 ```
@@ -505,7 +505,7 @@ All containers of an existing cluster can be listed by executing:
 ```console
 $ ./exadt ps MyCluster
  NODE ID      STATUS          IMAGE                       NAME   CONTAINER ID   CONTAINER NAME    EXPOSED PORTS       
- 11           Up 5 seconds    exasol/docker-db:6.0.0-d1   n11    e9347c3e41ca   MyCluster_11      9563->8563,2581->2580
+ 11           Up 5 seconds    exasol/docker-db:7.0.0-d1   n11    e9347c3e41ca   MyCluster_11      9563->8563,2581->2580
 ```
 
 The `EXPOSED PORTS` column shows all container ports that are reachable from outside the local host ('host'->'container'), usually one for the database and one for BucketFS.
@@ -533,9 +533,9 @@ $ docker pull exasol/docker-db:<version>
 $ pipenv install -r exadt_requirements.txt
 $ ./exadt update-cluster --image exasol/docker-db:<version> MyCluster
 Cluster 'MyCluster' has been successfully updated!
-- Image :  exasol/docker-db:6.0.0-d1 --> exasol/docker-db:6.0.0-d2
-- DB    :  6.0.0                     --> 6.0.1
-- OS    :  6.0.0                     --> 6.0.0
+- Image :  exasol/docker-db:7.0.0 --> exasol/docker-db:7.0.1
+- DB    :  7.0.0                     --> 7.0.1
+- OS    :  7.0.0                     --> 7.0.1
 Restart the cluster in order to apply the changes.
 ```
 
@@ -560,7 +560,7 @@ A cluster has to be stopped before it can be deleted (even if all containers are
 
 # Installing custom JDBC drivers
 
-Starting with version 6.0.7-d1, custom JDBC drivers can be added by uploading them into a bucket. The bucket and path for the drivers can be configured in each database section of EXAConf. The default configuration is:
+Custom JDBC drivers can be added by uploading them into a bucket. The bucket and path for the drivers can be configured in each database section of EXAConf. The default configuration is:
 
 ```console
 [DB : DB1]
@@ -595,7 +595,7 @@ If you use the default bucket and the default path, you can add multiple JDBC dr
 
 # Installing Oracle drivers
 
-Starting with version 6.0.7-d1, Oracle drivers can be added by uploading them into a bucket. The bucket and path for the drivers can be configured in each database section of EXAConf. The default configuration is:
+Oracle drivers can be added by uploading them into a bucket. The bucket and path for the drivers can be configured in each database section of EXAConf. The default configuration is:
 
 ```console
 [DB : DB1]
@@ -636,7 +636,7 @@ Please refer to the [offical manual](https://www.exasol.com/portal/display/DOC/D
 
 > ERROR::EXAConf: Integrity check failed! The stored checksum 'a2f605126a2ca6052b5477619975664f' does not match the actual checksum 'f9b9df0b9247b4696135c135ea066580'. Set checksum to 'COMMIT' if you made intentional changes.
 
-If you see a message similar to the one above, you probably modified an EXAConf that has already been used by an Exasol container or `exadt`. It is issued by the EXAConf integrity check (introduced in version 6.0.7-d1) that protects EXAConf from accidental changes and detects file corruption.
+If you see a message similar to the one above, you probably modified an EXAConf that has already been used by an Exasol container or `exadt`. It is issued by the EXAConf integrity check that protects EXAConf from accidental changes and detects file corruption.
 
 In order to solve the problem you have to set the checksum within EXAConf to 'COMMIT'. It can be found in the 'Global' section, near the top of the file:
 
