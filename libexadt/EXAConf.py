@@ -312,8 +312,8 @@ class EXAConf(object):
         # or taken from the Docker image).
         # The 'version' parameter is static and denotes the version
         # of the EXAConf python module and EXAConf format
-        self.version = "7.0.13"
-        self.re_version = "7.0.13"
+        self.version = "7.0.14"
+        self.re_version = "7.0.14"
         self.set_os_version(self.version)
         self.set_db_version(self.version)
         self.set_re_version(self.re_version)
@@ -3321,8 +3321,6 @@ class EXAConf(object):
                     conf.volume_quota = int(units2bytes(db_sec["VolumeQuota"]))
                 if "VolumeMoveDelay" in db_sec.scalars:
                     conf.volume_move_delay = db_sec["VolumeMoveDelay"]
-                if "AutoStart" in db_sec.scalars:
-                    conf.auto_start = db_sec.as_bool("AutoStart")
                 if "InitialSQL" in db_sec.scalars:
                     conf.initial_sql = db_sec["InitialSQL"]
                 if "DefaultSysPasswdHash" in db_sec.scalars:
@@ -3331,7 +3329,12 @@ class EXAConf(object):
                     conf.additional_sys_passwd_hashes = db_sec["AdditionalSysPasswdHashes"]
                 if "MasterDatabase" in db_sec.scalars:
                     conf.master_database = db_sec["MasterDatabase"]
-                else: conf.auto_start = True
+                    conf.auto_start = False # always disable auto start for worker databases
+                elif "AutoStart" in db_sec.scalars:
+                    conf.auto_start = db_sec.as_bool("AutoStart")
+                else:
+                    conf.auto_start = True # default to autostart for main database clusters
+
                 # JDBC
                 conf["jdbc"] = config()
                 if "JDBC" in db_sec.sections:
