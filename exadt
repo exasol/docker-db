@@ -9,8 +9,8 @@ from libexadt.EXAConf import config
 # Flush STDOUT continuously
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 
-my_version = "7.1.2"
-exaconf="/usr/opt/EXASuite-7/EXAClusterOS-7.1.2/bin/exaconf"
+my_version = "7.1.3"
+exaconf="/usr/opt/EXASuite-7/EXAClusterOS-7.1.3/bin/exaconf"
 info_arc_prefix = "exasol_docker_info"
 confirm_yes = False
 quiet_output = False
@@ -319,8 +319,8 @@ def init_cluster(cmd):
     files = os.listdir(root)
     if files:
         if cmd.force:
-            for e in files:
-                name = os.path.join(root, e)
+            for f in files:
+                name = os.path.join(root, f)
                 if os.path.isdir(name):
                     shutil.rmtree(name, True)
                 else:

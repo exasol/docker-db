@@ -2,7 +2,7 @@
 
 import re, base64, string, random, os, subprocess, time, shutil, hashlib, uuid, crypt, tempfile
 from subprocess import Popen, PIPE
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, List, Tuple, Union, Dict
 from types import ModuleType
 
 # pwd is only available on UNIX systems
@@ -15,7 +15,7 @@ except ImportError:
 shadow_prefixes = ['$1$', '$2a$', '$2y$', '$5$', '$6$']
  
 class atomic_file_writer(object): #{{{
-    def __init__(self, path, mode = 0o644, uid = None, gid = None):
+    def __init__(self, path : str, mode : int = 0o644, uid : Optional[int]= None, gid : Optional[int] = None) -> None:
         self._path = os.path.abspath(path)
         self._is_duplicate = False
         self._temp = tempfile.NamedTemporaryFile(mode = 'w',
@@ -30,7 +30,7 @@ class atomic_file_writer(object): #{{{
     def __getattr__(self, name):
         return getattr(self._temp, name)
 
-    def close(self):
+    def close(self) -> None:
         self._temp.close()
         self._is_duplicate = False
         if os.path.exists(self._path):
@@ -56,11 +56,15 @@ def read_exaconf(filename, ro = False, initialized = False): #{{{
     """
     Checks and reads the given EXAConf file.
     """
-    try:
-        from EXAConf import EXAConf, EXAConfError
-        EXAConf, EXAConfError #silence pyflakes
-    except ImportError:
+    # mypy has problems with try imports: https://github.com/python/mypy/issues/1153
+    if TYPE_CHECKING:
         from libconfd.EXAConf import EXAConf, EXAConfError
+    else:
+        try:
+            from libconfd.EXAConf import EXAConf, EXAConfError
+            EXAConf, EXAConfError #silence pyflakes
+        except ImportError:
+            from EXAConf import EXAConf, EXAConfError
 
     if not os.path.exists(filename):
         raise EXAConfError("EXAConf file '%s' does not exist!" % filename)
@@ -73,26 +77,30 @@ def read_exaconf(filename, ro = False, initialized = False): #{{{
         raise EXAConfError("EXAConf in '%s' is not inizalized!" % filename)
     return exaconf
 #}}}
- 
-def units2bytes(data): #{{{
-    ma_units = units2bytes.re_parse.match(str(data))
-    if not ma_units: raise RuntimeError('Could not parse %s as number with units.' % repr(data))
+
+#{{{
+_units2bytes_re_parse = re.compile(r'^\s*([0-9]+)(?:[.]([0-9]+))?\s*(?:([KkMmGgTtPpEeZzYy])(i)?)?[Bb]?\s*$')
+_units2bytes_convf = lambda x: {'k': x ** 1, 'm': x ** 2, 'g': x ** 3, 't': x ** 4, 'p': x ** 5, 'e': x ** 6, 'z': x ** 7, 'y': x ** 8, None: 1}
+_units2bytes_convd : Dict[Optional[str], int] = _units2bytes_convf(1000)
+_units2bytes_convb : Dict[Optional[str], int] = _units2bytes_convf(1024)
+def units2bytes(data) -> Union[int,float]:
+    ma_units = _units2bytes_re_parse.match(str(data))
+    if not ma_units:
+        raise RuntimeError('Could not parse %s as number with units.' % repr(data))
     num1, num2, unit, two = ma_units.groups()
     num1 = num1.strip().replace(' ', '')
-    if unit is not None: unit = unit.lower()
-    if num2 is None: num = int(num1)
-    else: num = float("%s.%s" % (num1, num2.strip()))
+    if unit is not None:
+        unit = unit.lower()
+    if num2 is None:
+        num = int(num1)
+    else:
+        num = float("%s.%s" % (num1, num2.strip()))
     if two is None:
-        return num * units2bytes.convd[unit]
-    return num * units2bytes.convb[unit]
-# There's no good way to annotate these right now. See https://github.com/python/mypy/issues/2087
-units2bytes.re_parse = re.compile(r'^\s*([0-9]+)(?:[.]([0-9]+))?\s*(?:([KkMmGgTtPpEeZzYy])(i)?)?[Bb]?\s*$')  # type: ignore[attr-defined]
-units2bytes.convf = lambda x: {'k': x ** 1, 'm': x ** 2, 'g': x ** 3, 't': x ** 4, 'p': x ** 5, 'e': x ** 6, 'z': x ** 7, 'y': x ** 8, None: 1}  # type: ignore[attr-defined]
-units2bytes.convd = units2bytes.convf(1000)  # type: ignore[attr-defined]
-units2bytes.convb = units2bytes.convf(1024)  # type: ignore[attr-defined]
+        return num * _units2bytes_convd[unit]
+    return num * _units2bytes_convb[unit]
 #}}}
 
-def bytes2units(num): #{{{
+def bytes2units(num) -> str: #{{{
     num = float(num)
     for x in ('B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'):
         if num < 1024.0:
@@ -342,13 +350,13 @@ def get_first_interface(timeout=1): #{{{
         time_elapsed += 1
 #}}}
 
-def get_all_interfaces(timeout=1, up_only=True): #{{{
+def get_all_interfaces(timeout=1, up_only=True) -> List[Tuple[str, str, str]]: #{{{
     """
     Returns a list of tuples of all interfaces in state UP (if 'up_only' is True).
     Retries until at least one interface is found or the given time (in seconds) has elapsed.
     """
 
-    interfaces = []
+    interfaces : List[Tuple[str, str, str]] = []
     valid_if = False
     time_elapsed = 0
     while len(interfaces) == 0 and time_elapsed < timeout:

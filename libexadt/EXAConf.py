@@ -8,12 +8,17 @@ import math, abc
 import functools
 from urllib.parse import urlparse
 from collections import OrderedDict as odict
-from typing import Optional
-try:
-    from .util import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str
-    units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str #silence pyflakes
-except:
+from typing import Optional, TYPE_CHECKING
+# mypy has problems with try imports: https://github.com/python/mypy/issues/1153
+if TYPE_CHECKING:
     from libconfd.common.util import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str
+    units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str #silence pyflakes
+else:
+    try:
+        from .util import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str
+        units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str #silence pyflakes
+    except:
+        from libconfd.common.util import units2bytes, bytes2units, gen_base64_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str
 
 # {{{ Class EXAConfError
 
@@ -366,8 +371,8 @@ class EXAConf(object):
         # or taken from the Docker image).
         # The 'version' parameter is static and denotes the version
         # of the EXAConf python module and EXAConf format
-        self.version = "7.1.2"
-        self.re_version = "7.1.2"
+        self.version = "7.1.3"
+        self.re_version = "7.1.3"
         self.set_os_version(self.version)
         self.set_db_version(self.version)
         self.set_re_version(self.re_version)
@@ -1644,7 +1649,7 @@ class EXAConf(object):
 
     # {{{ Add volume
 
-    def add_volume(self, name, vol_type, size, disk, redundancy, nodes, owner,
+    def add_volume(self, *, name, vol_type, size, disk, redundancy, nodes, owner,
                    num_master_nodes = None, permissions = None, labels = None,
                    block_size = None,  stripe_size = None, shared = None,
                    http_port = None, https_port = None,
@@ -1951,20 +1956,24 @@ class EXAConf(object):
 
         #add volume if it doesn't exist
         if vol_name != "_all" and not self.volume_exists(vol_name):
-            self.add_volume(vol_conf.name, vol_conf.type, vol_conf.size, vol_conf.disk, vol_conf.redundancy,
-                            vol_conf.owner, vol_conf.nodes,
-                            vol_conf.num_master_nodes if "num_master_nodes" in vol_conf else None,
-                            vol_conf.redundancy if "redundancy" in vol_conf else None,
-                            vol_conf.labels if "labels" in vol_conf else None,
-                            vol_conf.permissions if "permissions" in vol_conf else None,
-                            vol_conf.block_size if "block_size" in vol_conf else None,
-                            vol_conf.stripe_size if "stripe_size" in vol_conf else None,
-                            vol_conf.shared if "shared" in vol_conf else None,
-                            vol_conf.http_port if "http_port" in vol_conf else None,
-                            vol_conf.https_port if "https_port" in vol_conf else None,
-                            vol_conf.ftp_port if "ftp_port" in vol_conf else None,
-                            vol_conf.ftps_port if "ftps_port" in vol_conf else None,
-                            vol_conf.sftp_port if "sftp_port" in vol_conf else None,
+            self.add_volume(name = vol_conf.name,
+                            vol_type = vol_conf.type,
+                            size = vol_conf.size,
+                            disk = vol_conf.disk,
+                            redundancy = vol_conf.redundancy,
+                            nodes = vol_conf.nodes,
+                            owner = vol_conf.owner,
+                            num_master_nodes = vol_conf.num_master_nodes if "num_master_nodes" in vol_conf else None,
+                            permissions = vol_conf.permissions if "permissions" in vol_conf else None,
+                            labels = vol_conf.labels if "labels" in vol_conf else None,
+                            block_size = vol_conf.block_size if "block_size" in vol_conf else None,
+                            stripe_size = vol_conf.stripe_size if "stripe_size" in vol_conf else None,
+                            shared = vol_conf.shared if "shared" in vol_conf else None,
+                            http_port = vol_conf.http_port if "http_port" in vol_conf else None,
+                            https_port = vol_conf.https_port if "https_port" in vol_conf else None,
+                            ftp_port = vol_conf.ftp_port if "ftp_port" in vol_conf else None,
+                            ftps_port = vol_conf.ftps_port if "ftps_port" in vol_conf else None,
+                            sftp_port = vol_conf.sftp_port if "sftp_port" in vol_conf else None,
                             commit = commit)
             # nothing to change, since the ID can't be "_all"
             return
@@ -2619,7 +2628,7 @@ class EXAConf(object):
 
     # {{{ Add user
 
-    def add_user(self, username, userid, group, login_enabled,
+    def add_user(self, *, username, userid, group, login_enabled,
                  password = None, encode_passwd = False,
                  additional_groups = None, authorized_keys = None,
                  commit = True):
@@ -2731,7 +2740,7 @@ class EXAConf(object):
 
     # {{{ Add group
 
-    def add_group(self, groupname, groupid,
+    def add_group(self, *, groupname, groupid,
                   commit = True):
         """
         Add the given group to EXAConf.
@@ -2774,7 +2783,7 @@ class EXAConf(object):
         """
 
         if group_name != "_all" and not self.group_exists(group_name):
-            self.add_group(gid = group_conf.id)
+            self.add_group(groupname = group_name, groupid = group_conf.id)
             return
 
         # change configuration for existing groups
@@ -2828,12 +2837,12 @@ class EXAConf(object):
                 gname = "exausers" + str(suffixes[1])
                 suffixes[1] += 1
                 print("Adding group '%s' with GID '%i' (owner of '%s')." % (gname, gid, name))
-                self.add_group(name=gname, gid=gid, commit=False)
+                self.add_group(groupname=gname, groupid=gid, commit=False)
             if not self.uid_exists(uid):
                 uname = "exadefusr" + str(suffixes[0])
                 suffixes[0] += 1
                 print("Adding user '%s' with UID '%i' (owner of '%s')." % (uname, uid, name))
-                self.add_user(name=uname, uid=uid,
+                self.add_user(username=uname, userid=uid,
                               group=gname if gname else "exausers",
                               login_enabled=False, commit=False)
         # databases
@@ -3166,9 +3175,8 @@ class EXAConf(object):
         else:
             raise EXAConfError ('Given plugin ({plugin_name}) does not exist')
     # }}}
-    # {{{ Monitoring plugins:get 
-    def get_plugins (self, plugin_name: Optional[str] = None) -> Optional[odict]:
-        ret_val: Optional[odict] = None
+    # {{{ Monitoring plugins:get
+    def get_plugins (self, plugin_name: Optional[str] = None) -> odict:
         plugins: odict = config ()
         for section in self.config.sections:
             if section.split (':')[0].strip () == 'Plugin':
@@ -3179,15 +3187,11 @@ class EXAConf(object):
                 conf.bucketfs = plugin_sec['BucketFS']
                 conf.bucket = plugin_sec['Bucket']
                 conf.dir = plugin_sec['Dir']
-                plugins[pname] = conf
 
-        if plugin_name and plugin_name in plugins:
-            ret_val = config ()
-            ret_val[plugin_name] = plugins[plugin_name]
-        elif not plugin_name:
-            ret_val = plugins
+                if plugin_name is None or plugin_name == pname:
+                    plugins[pname] = conf
 
-        return ret_val
+        return plugins
     # }}}
     
     ############################## GETTER #################################
@@ -3397,7 +3401,7 @@ class EXAConf(object):
         """
         Returns the version of the associated EXAConf file (not the EXAConf python module). If not yet initialized, the python module version is returned instead.
         """
-        if self.initialized:
+        if self.initialized():
             return self.config["Global"]["ConfVersion"]
         else:
             return self.version
@@ -3518,11 +3522,10 @@ class EXAConf(object):
         """
         Returns a list off all duplicates in the given sequence.
         """
-        if len(seq) == 0:
-            return None
         seen = set()
-        seen_twice = set(x for x in seq if x in seen or seen.add(x))
-        return list(seen_twice)
+        # This is not completely obvious, but the `seen.add()` here does not return a bool
+        # It always returns None and the `or` is just used to invoke it for unseen items
+        return [x for x in seq if x in seen or seen.add(x)] # type: ignore[func-returns-value]
 
     # }}}
     # {{{ Get network
@@ -4254,8 +4257,8 @@ class EXAConf(object):
         """
 
         result = config()
-        config.volumes = []
-        config.dbs = []
+        result.volumes = []
+        result.dbs = []
         # check volumes
         volumes = self.get_volumes()
         for v in volumes.values():
@@ -4413,10 +4416,11 @@ class EXAConf(object):
         """
         # build init command
         init_cmd = os.path.join(self.re_dir, "bin/numactl")
-        try: numa_node = int(os.environ.get('COSLWD_NUMA_NODE', '').strip())
-        except: numa_node = None
-        if numa_node is None: init_args = ["--interleave=all"]
-        else: init_args = ["--cpunodebind=%d" % numa_node, "--membind=%d" % numa_node]
+        try:
+            numa_node = int(os.environ.get('COSLWD_NUMA_NODE', '').strip())
+            init_args = ["--cpunodebind=%d" % numa_node, "--membind=%d" % numa_node]
+        except:
+            init_args = ["--interleave=all"]
         init_args.append(os.path.join(self.os_dir, "libexec/exainit.py"))
         return (init_cmd, init_args)
 

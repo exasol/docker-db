@@ -1,18 +1,25 @@
 #! /usr/bin/env python3
 
 import os, sys, argparse, time, getpass, random
-try:
-    from libexadt.EXAConf import EXAConfError
-    from libexadt import util
-    assert EXAConfError, util #silence pyflakes
-except ImportError:
-    sys.path.insert(0,'/usr/opt/EXASuite-7/EXAClusterOS-7.1.2/lib')
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
     from libconfd.common import util
     from libconfd.common.database import db_reorder_affinities
     from libconfd.EXAConf import EXAConfError
     import exacos
+else:
+    try:
+        from libexadt.EXAConf import EXAConfError
+        from libexadt import util
+        assert EXAConfError, util #silence pyflakes
+    except ImportError:
+        sys.path.insert(0,'/usr/opt/EXASuite-7/EXAClusterOS-7.1.3/lib')
+        from libconfd.common import util
+        from libconfd.common.database import db_reorder_affinities
+        from libconfd.EXAConf import EXAConfError
+        import exacos
 
-my_version = "7.1.2"
+my_version = "7.1.3"
 
 # {{{ Setup logging
 _log_type_list = ('Error', 'Info') # only Error and Info is used now, more can be added
@@ -156,9 +163,20 @@ def add_volume(cmd):
     if vol_owner is None or len(vol_owner) != 2:
         print("Please specify user and group ID for owner (e.g. 1000:1000)")
         return 1
-    exaconf.add_volume(cmd.name, cmd.type, cmd.size, cmd.disk, cmd.redundancy,
-                       vol_nodes, vol_owner, cmd.num_master_nodes, cmd.perm,
-                       cmd.labels, cmd.block_size, cmd.stripe_size)
+    exaconf.add_volume(
+        name = cmd.name,
+        vol_type = cmd.type,
+        size = cmd.size,
+        disk = cmd.disk,
+        redundancy = cmd.redundancy,
+        nodes = vol_nodes,
+        owner = vol_owner,
+        num_master_nodes = cmd.num_master_nodes,
+        perm = cmd.perm,
+        labels = cmd.labels,
+        block_size = cmd.block_size,
+        stripe_size = cmd.stripe_size
+    )
 # }}}
 # {{{ Modify volume
 def modify_volume(cmd):
