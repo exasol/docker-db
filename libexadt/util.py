@@ -488,7 +488,7 @@ def string_to_seconds (data): #{{{
     return seconds if len (data) == 0 else -1
 # }}}
 
-def timed_run(cmd, timeout = 60): #{{{
+def timed_run(cmd: List[str], timeout: int = 60, amount_limit: int = 16*1024*1024) -> Tuple[int, Optional[Tuple[str,str]]]: # {{{
     """
     @arguments:
         @cmd, a list which includes commands and their arguments
@@ -497,19 +497,17 @@ def timed_run(cmd, timeout = 60): #{{{
         @return_code, if it's a standard command, 0 means success; otherwise, self explained
         @streamed_data, streamed output for both stdout and stderr, a list
     """
-    p = Popen(cmd, stdout = PIPE, stderr = PIPE)
-    start_time = time.monotonic()
-    while (time.monotonic() - start_time) < timeout:
-        if p.poll() is not None:
-            x = tuple([s.decode() for s in p.communicate()])
-            return (p.returncode, x)
-        else:
-            time.sleep(0.1)
+    p = Popen(cmd, stdout = PIPE, stderr = PIPE, close_fds = True)
     try:
-        p.kill ()
-    except:
-        pass
+        stdout, stderr = p.communicate(timeout = timeout)
+        if len(stdout) + len(stderr) > amount_limit:
+            return(-1, None)
+        return (p.returncode, (stdout.decode(), stderr.decode()))
+    except subprocess.TimeoutExpired:
+        p.kill()
+        return (-1, None)
     return (-1, None)
 # }}}
-#}}}
+
+# }}}
 

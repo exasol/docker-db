@@ -371,8 +371,8 @@ class EXAConf(object):
         # or taken from the Docker image).
         # The 'version' parameter is static and denotes the version
         # of the EXAConf python module and EXAConf format
-        self.version = "7.1.3"
-        self.re_version = "7.1.3"
+        self.version = "7.1.4"
+        self.re_version = "7.1.4"
         self.set_os_version(self.version)
         self.set_db_version(self.version)
         self.set_re_version(self.re_version)
@@ -1651,7 +1651,8 @@ class EXAConf(object):
 
     def add_volume(self, *, name, vol_type, size, disk, redundancy, nodes, owner,
                    num_master_nodes = None, permissions = None, labels = None,
-                   block_size = None,  stripe_size = None, shared = None,
+                   block_size = None,  stripe_size = None,
+                   partition_size = None, shared = None,
                    http_port = None, https_port = None,
                    ftp_port = None, ftps_port = None, sftp_port = None,
                    commit = True):
@@ -1702,6 +1703,9 @@ class EXAConf(object):
         vol_sec["Redundancy"] = redundancy
         vol_sec["BlockSize"] = block_size if isinstance(block_size, str) else bytes2units(block_size)
         vol_sec["StripeSize"] = stripe_size if isinstance(stripe_size, str) else bytes2units(stripe_size)
+        if vol_type == 'archive':
+            if partition_size != None:
+                vol_sec["PartitionSize"] = partition_size if isinstance(partition_size, str) else bytes2units(partition_size)
         vol_sec["Owner"] = str(owner[0]) + " : " + str(owner[1])
         vol_sec["Permissions"] = permissions
         # optional values
@@ -1963,6 +1967,7 @@ class EXAConf(object):
                             redundancy = vol_conf.redundancy,
                             nodes = vol_conf.nodes,
                             owner = vol_conf.owner,
+                            partition_size = vol_conf.partition_size if "partition_size" in vol_conf else None,
                             num_master_nodes = vol_conf.num_master_nodes if "num_master_nodes" in vol_conf else None,
                             permissions = vol_conf.permissions if "permissions" in vol_conf else None,
                             labels = vol_conf.labels if "labels" in vol_conf else None,
@@ -1997,6 +2002,8 @@ class EXAConf(object):
                     vol_sec["Nodes"] = ','.join([str(x) for x in vol_conf.nodes])
                 if "num_master_nodes" in vol_conf:
                     vol_sec["NumMasterNodes"] = str(vol_conf.num_master_nodes)
+                if vol_conf.type == 'archive' and 'partition_size' in vol_conf:
+                    vol_sec["PartitionSize"] = vol_conf.partition_size if isinstance(vol_conf.size, str) else bytes2units(vol_conf.partition_size)
                 if "priority" in vol_conf:
                     vol_sec["Priority"] = str(vol_conf.priority)
                 if "shared" in vol_conf:
@@ -2707,7 +2714,7 @@ class EXAConf(object):
                 user_conf.update({k:v for k,v in self.get_users()[username].items() if k not in user_conf})
                 user_sec = self.config["Users"][username]
                 # encode password and merge groups right in the user_conf
-                if "passwd" in user_conf:
+                if "passwd" in user_conf and len(user_conf.passwd) > 0:
                     if encode_passwd is True or is_shadow_encoded(user_conf.passwd) is False:
                         user_conf.passwd = encode_shadow_passwd(user_conf.passwd)
                 if "additional_groups" in user_conf and len(user_conf.additional_groups) > 0:
@@ -3992,6 +3999,8 @@ class EXAConf(object):
                     conf.redundancy = vol_sec.as_int("Redundancy")
                     conf.owner = tuple([ int(x.strip()) for x in vol_sec["Owner"].split(":") if x.strip() != "" ])
                     conf.nodes = [ int(n.strip()) for n in vol_sec["Nodes"].split(",") if n.strip() != "" ]
+                    if 'PartitionSize' in vol_sec.scalars:
+                        conf.partition_size = units2bytes(vol_sec["PartitionSize"])
                     # optional values
                     conf.permissions = vol_sec["Permissions"] if "Permissions" in vol_sec.scalars else self.def_vol_perm
                     conf.num_master_nodes = int(vol_sec["NumMasterNodes"]) if "NumMasterNodes" in vol_sec.scalars else len(conf.nodes)
@@ -4510,10 +4519,13 @@ class EXAConf(object):
                 user_conf.login_enabled = user_sec.as_bool("LoginEnabled")
                 if "Passwd" in user_sec.scalars:
                     user_conf.passwd = user_sec["Passwd"]
+                else: user_conf.passwd = ""
                 if "AdditionalGroups" in user_sec.scalars:
                     user_conf.additional_groups = [ g.strip() for g in user_sec["AdditionalGroups"].split(',') if g.strip() != "" ]
+                else: user_conf.additional_groups = []
                 if "AuthorizedKeys" in user_sec.scalars:
                     user_conf.authorized_keys = [ k.strip() for k in user_sec["AuthorizedKeys"].split(',') if k.strip() != "" ]
+                else: user_conf.authorized_keys = []
                 user_configs[user] = user_conf
         return self.filter_configs(user_configs, filters)
 
