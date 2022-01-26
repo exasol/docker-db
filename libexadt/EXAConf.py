@@ -312,8 +312,8 @@ class EXAConf(object):
         # or taken from the Docker image).
         # The 'version' parameter is static and denotes the version
         # of the EXAConf python module and EXAConf format
-        self.version = "7.0.14"
-        self.re_version = "7.0.14"
+        self.version = "7.0.15"
+        self.re_version = "7.0.15"
         self.set_os_version(self.version)
         self.set_db_version(self.version)
         self.set_re_version(self.re_version)

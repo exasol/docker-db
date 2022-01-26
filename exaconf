@@ -6,13 +6,13 @@ try:
     from libexadt import util
     assert EXAConfError, util #silence pyflakes
 except ImportError:
-    sys.path.insert(0,'/usr/opt/EXASuite-7/EXAClusterOS-7.0.14/lib')
+    sys.path.insert(0,'/usr/opt/EXASuite-7/EXAClusterOS-7.0.15/lib')
     from libconfd.common import util
     from libconfd.common.database import db_reorder_affinities
     from libconfd.EXAConf import EXAConfError
     import exacos
 
-my_version = "7.0.14"
+my_version = "7.0.15"
 
 # {{{ Setup logging
 _log_type_list = ('Error', 'Info') # only Error and Info is used now, more can be added
