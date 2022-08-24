@@ -91,6 +91,7 @@ def units2bytes(data) -> Union[int,float]:
     num1 = num1.strip().replace(' ', '')
     if unit is not None:
         unit = unit.lower()
+    num : Union[float, int]
     if num2 is None:
         num = int(num1)
     else:
