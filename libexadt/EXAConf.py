@@ -352,6 +352,7 @@ class EXAConf(object):
     def_logging_LogRotationTypes = ['local', 'remote']
     def_logging_RemoteLogRotationVolume = 'cloud_data_remote_volume'
     def_logging_RemoteLogRotationPrefix = "Logs"
+    def_logging_backup_count = 60
 
     # }}}
     # {{{ Init
@@ -371,8 +372,8 @@ class EXAConf(object):
         # or taken from the Docker image).
         # The 'version' parameter is static and denotes the version
         # of the EXAConf python module and EXAConf format
-        self.version = "7.1.15"
-        self.re_version = "7.1.15"
+        self.version = "7.1.16"
+        self.re_version = "7.1.16"
         self.set_os_version(self.version)
         self.set_db_version(self.version)
         self.set_re_version(self.re_version)
@@ -3298,6 +3299,20 @@ class EXAConf(object):
             return self.config["Global"]["RSyslogFilename"]
         else:
             return self.def_rsyslog_filename
+
+    # }}}
+    # {{{ Get log backup count
+
+    def get_log_backup_count(self):
+        """
+        Return the maximal log backup count configured
+        """
+        try:
+            backup_count = int(self.config["Logging"]["BackupCount"])
+            if backup_count < 1:
+                return self.def_logging_backup_count
+            return backup_count
+        except: return self.def_logging_backup_count
 
     # }}}
     # {{{ Get c4 socket path
