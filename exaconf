@@ -1,0 +1,5 @@
+#!/opt/exasol/cos-8.29.0/bin/python3
+
+import sys
+from libexadt.cli.exaconf import main
+sys.exit(main())

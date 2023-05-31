@@ -1,0 +1,61 @@
+MIME-Version: 1.0
+Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----CB134B07A6BB9D39258D5F4CADF727A6"
+
+This is an S/MIME signed message
+
+------CB134B07A6BB9D39258D5F4CADF727A6
+[Exasol_DB_license]
+schema_version = 1
+
+[Contract]
+license_id = 1
+company_name = "Exasol"
+comment = "Exasol Community Edition."
+distributor = "Exasol"
+distributor_id = 1
+expiration_date = inf
+
+[Limits]
+max_db_mem_size_in_gb = 10
+max_db_raw_data_size_in_gb = 10
+max_num_clusters = 1
+max_nodes_per_cluster = 1
+
+------CB134B07A6BB9D39258D5F4CADF727A6
+Content-Type: application/x-pkcs7-signature; name="smime.p7s"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="smime.p7s"
+
+MIIFdQYJKoZIhvcNAQcCoIIFZjCCBWICAQExDzANBglghkgBZQMEAgEFADALBgkq
+hkiG9w0BBwGgggMCMIIC/jCCAeagAwIBAgIJAP9fYS432RJBMA0GCSqGSIb3DQEB
+CwUAMBgxFjAUBgNVBAMMDWNhLmV4YXNvbC5jb20wHhcNMjMwNTAyMTMyMDM0WhcN
+NDUxMDA1MTMyMDM0WjAhMR8wHQYDVQQDDBZkZXZlbG9wbWVudC5leGFzb2wuY29t
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtKn+TlwSLCY2YN5fOxNL
+cPzL3PeWYdwihOG2FnPgU/XDRAT8wwM8BmEDB5N6Wukm+P9IlrteJSq1jiRIYjjP
+mQHLsESjdrSNy4RzyjwQBYtOsip1QnWLBvc6bwo2GNqWDJ3tpVhXVFaVG0YY4SHa
+MIiJZiJQugB8/yjgCLiBlyQ8SWtjCZOCDIWdr2bVYC2yETs5VGZMMb68bDEhDwgQ
+JVavZ1Wkcg9CQv7/AMxlvX2jUcGlrY7FI49yITamMp6FZmOjYj5QmndSkvYCFdX7
+Lcw6YnAAIGdq9PQz3AP1p3SndQPbXATOa6B5tFgRhzBbq6mBZCmn0Fae5AEv0hPq
+AwIDAQABo0IwQDAsBgNVHREEJTAjgglsb2NhbGhvc3SCFmRldmVsb3BtZW50LmV4
+YXNvbC5jb20wEAYDVR0gBAkwBzAFBgMqAwQwDQYJKoZIhvcNAQELBQADggEBAJjC
+g4c1uHyD34vtA56YpmdWa2dUDmX8UNiSCBp58SX5Jix88eq3QBhQQfZqf5ZawGk3
+J6CvEbAjJmTwLOhkgZ2sYj8ht728HkT38d4+LzbOfOa73lmidBexDuuVhIzJrgk4
+6zdVpYUacQQc3QGOopMunmbfLNeFYPSoTYHSk1CByTq7UOTFsKpgw1S4oxptTXIB
+ortiBoT2F+ZuP4tIOguETSPbLTaGl756EJvNLAt+P1nmAS9opbEBB8RSTCWrKHCe
+kS8/0ZcDDfv/Gwmq+xkO1kRzJS1iH/TjpBRcOtHov4v8lA0d6pSaN2nBSIyfwZa6
+NWu5oZuCNNckoppkLEUxggI3MIICMwIBATAlMBgxFjAUBgNVBAMMDWNhLmV4YXNv
+bC5jb20CCQD/X2EuN9kSQTANBglghkgBZQMEAgEFAKCB5DAYBgkqhkiG9w0BCQMx
+CwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0yMzA1MDIxNTAzNTVaMC8GCSqG
+SIb3DQEJBDEiBCBszhpjroCzVAI9/66dER0qd7DuVs4+uvh5bumGVQpwSTB5Bgkq
+hkiG9w0BCQ8xbDBqMAsGCWCGSAFlAwQBKjALBglghkgBZQMEARYwCwYJYIZIAWUD
+BAECMAoGCCqGSIb3DQMHMA4GCCqGSIb3DQMCAgIAgDANBggqhkiG9w0DAgIBQDAH
+BgUrDgMCBzANBggqhkiG9w0DAgIBKDANBgkqhkiG9w0BAQEFAASCAQCZ6mvgS/BD
+MAEAz8JAaQzlVeZsGDoLfcUpDI2p+PhyuRNCK2EBB0T25Hz15ery1ZuUegY0S+Jm
+m42Z2yMFsi4aYetvnq4JnYVPM7J8dAjKc42A0+7rdjrwwlJXI/4NqJaZw85LLIPb
+Z+uebUbjpxo7Y9r8dhtXX2fMG9wwncl0FBNyI/PZTN/yWRywi5CH/XXW0JZVtLZ4
+Rl5M8WU7/9APeJOl6AtlSuT/oJ5xoPbChdXw1WfkCdtARopUilYSHWuiNeVmw7RU
+jR+Z+fjybH5LOnpDRUmSLrT/OTfh1d+VINIz4+sXlyB5U6vmIzVBu2hnkxuRDIGR
+HNcxlJJEqU7Y
+
+------CB134B07A6BB9D39258D5F4CADF727A6--
+

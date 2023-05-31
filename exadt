@@ -1,0 +1,1721 @@
+#! /usr/bin/env python3
+# NOTE: These are only here until the code is fixed and should be removed.
+# Do not copy them to new files
+# mypy: no_check_untyped_defs
+
+import sys, os, argparse, pprint, subprocess, time, tarfile, io, docker, ipaddr
+from libexadt import exadt_conf, docker_handler, device_handler, docker_rpc_handler, EXAConf, util
+from io import BytesIO
+import shutil, yaml
+from libexadt.EXAConf import config
+import exacos_constants
+
+# Flush STDOUT continuously
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
+
+my_version = exacos_constants.full_version()
+exaconf = exacos_constants.prefix_path() / "bin" / "exaconf"
+info_arc_prefix = "exasol_docker_info"
+confirm_yes = False
+quiet_output = False
+
+# {{{ static variables for the "self contained image"
+sc_root = os.getenv ('SC_ROOT','/exa')
+sc_etc = os.path.join (sc_root, 'etc')
+sc_user = 500
+sc_group = 500
+sc_saas = False
+sc_init_sql = None
+sc_sys_passwd = None
+sc_add_sys_passwd = None
+sc_idp_config = None
+sc_db_params = None
+sc_ui_domain = None
+sc_no_db = False
+sc_no_odirect = False
+sc_cloud_data_volume = None
+sc_cache_volume_disk = None
+sc_cloud_sync_volume = None
+sc_cluster_name = "cl4"
+sc_image = "exasol/docker-db:latest" #not relevant
+sc_device_type = "file"
+sc_license = "/.license.xml"
+cos_auth_socket = "/var/run/ecos_unix_auth"
+parser: argparse.Namespace
+parser_isc: argparse.Namespace
+# }}}
+# {{{ Log functions
+def log_err(msg):
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
+
+def log_msg(msg):
+    if not quiet_output:
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stdout, flush=True)
+# }}}
+# {{{ Get script path
+def get_script_path():
+    """
+    Returns the absolute path of the exadt script that is currently executed.
+    """
+    script = os.path.realpath(__file__)
+    # __file__ may point to the .pyc file
+    if script.endswith(".pyc"):
+        script = script[:-1]
+    return script
+# }}}
+# {{{ Confirm
+def confirm(msg):
+    """
+    Asks the user for confirmation.
+    """
+    if confirm_yes:
+        return True
+
+    choice = ""
+    while choice not in set(['y','Y','n','N']):
+        choice = input("%s (y/n): " % msg).lower()
+    return choice == 'y'
+# }}}
+# {{{ call_exaconf
+def call_exaconf(cmd):
+    """
+    Execute exaconf with the given arguments.
+    """
+    exaconf_args = [exaconf,]
+    for a in cmd.args.split(' '):
+        if str(a).strip().lower() == 'none':
+            exaconf_args.append(None)
+        else:
+            exaconf_args.append(str(a).strip())
+    subprocess.call(exaconf_args)
+# }}}
+# {{{ Cluster started
+def cluster_started(root):
+    """
+    Checks if the cluster with the given root has been started
+    (i. e. there are containers of this cluster).
+    """
+    try:
+        exaconf = EXAConf.EXAConf(root, False)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        # return False (necessary e. g. if the root-directory has already been deleted)
+        return False
+    # EXAConf may be un-inititalized if delete-cluster is
+    # called directly after create-cluster
+    if not exaconf.initialized():
+        return False
+    try:
+        # validate manually if initialized (see above)
+        exaconf.validate()
+        dh = docker_handler.docker_handler()
+        dh.set_exaconf(exaconf)
+        res = dh.cluster_started()
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+    return res
+# }}}
+# {{{ Create cluster
+def create_cluster(cmd):
+    conf = exadt_conf.exadt_conf()
+    # always us absolute path
+    root = os.path.abspath(cmd.root)
+    root = os.path.normpath(root)
+    # create root-directory if requested
+    if cmd.create_root:
+        try:
+            os.makedirs(root)
+        except OSError:
+            if not os.path.isdir(root):
+                print("Failed to create root-directory '%s'!" % root)
+                raise
+    elif not os.path.isdir(root):
+        print("Root directory '%s' does not exist (or is a file)!" % root)
+        sys.exit(1)
+    # create entry in config
+    try:
+        conf.create_cluster(cmd.cluster, root)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Delete cluster
+def delete_cluster(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    # check if has been started (i. e. containers exist)
+    if cluster_started(root):
+        print("Cluster '%s' has existing containers. It has to be stopped before it can be deleted!" % cmd.cluster)
+        sys.exit(1)
+    # ask for confirmation
+    msg = "Do you really want to delete cluster '%s'%s? " % \
+            (cmd.cluster, " (and all file-devices)" if not (cmd.keep_root or cmd.keep_mapped_devices) else "")
+    if not confirm(msg):
+        print("Aborted.")
+        sys.exit(1)
+
+    # check if cluster has been initialized (may be un-initialized
+    # if delete-cluster is called directly after create-cluster)
+    initialized = False
+    try:
+        exaconf = EXAConf.EXAConf(root, False)
+        initialized = exaconf.initialized()
+    except EXAConf.EXAConfError as e:
+        print(e)
+        # interpret exception as "not initialized" and proceed
+
+    # delete root-dir if not prevented
+    # NOTE  : this is done by starting new containers and executing 'rm -rf /exa' because
+    #         some of the files belong to root (due to the privileged mode) and can't
+    #         be deleted if exadt has been called by a normal user.
+    if initialized and not cmd.keep_root:
+        print("Deleting root directory '%s'." % root)
+        try:
+            dh = docker_handler.docker_handler(quiet=True)
+            dh.set_exaconf(exaconf)
+            # -> wait for the 'rm containers' to finish
+            #    (avoids conflicts due to deleting the same files)
+            dh.start_cluster(cmd = "rm -rf /exa", auto_remove=True, dummy_mode=True,
+                             wait=True, wait_timeout=10)
+        except docker_handler.DockerError as e:
+            print("Errors occured while trying to delete the root directory: %s" % e)
+        # delete the root-directory itself and the node directories
+        shutil.rmtree(root, True)
+    # un-initialized clusters have to be deleted without accessing EXAConf
+    elif not cmd.keep_root:
+        shutil.rmtree(root, True)
+
+    # check if deletion was successfull (may fail if there are root-only files in an unitialized cluster)
+    if os.path.isdir(root):
+        print("WARNING: root directory '%s' could not be completely deleted! Please delete it manually before reusing it." % root)
+
+    # delete mapped devices if not prevented
+    # --> we delete the complete '$name' directories (they are created automatically)
+    # NOTE : we do this AFTER deleting the root directory, otherwise the docker-handler would
+    #        fail to mount the volumes specified in EXAConf (when executing the deletion command)
+    if initialized and not cmd.keep_mapped_devices:
+        try:
+            # validate manually if initalized
+            exaconf.validate()
+            nodes_conf = exaconf.get_nodes()
+        except EXAConf.EXAConfError as e:
+            print(e)
+        for node in nodes_conf.values():
+            for disk in node.disks.values():
+                if "mapping" in disk:
+                    for dev,path in disk.mapping:
+                        try:
+                            # follow symlink
+                            path = os.path.realpath(path)
+                            # path can also be a file within '$name/'!
+                            if os.path.isfile(path):
+                                path = os.path.dirname(path)
+                            print("Deleting directory '%s'." % path)
+                            shutil.rmtree(path, True)
+                        except OSError as e:
+                            print("Failed to delete '%s': %s." % (path, e))
+
+    # delete entry from config
+    conf.delete_cluster(cmd.cluster)
+# }}}
+# {{{ Extract versions
+def extract_versions(cmd=None, env=None, image=None):
+    """
+    Extracts DB, OS, RE and image version from either:
+    - the given command,
+    - the given environment or
+    - the given docker image
+    and returns the first occurence of each version number.
+    """
+    db_version = None
+    os_version = None
+    re_version = None
+    img_version = None
+    meta_package = None
+    # 1. use versions given in the command
+    if cmd:
+        if cmd.db_version and cmd.db_version.strip() != "":
+            db_version = cmd.db_version.strip()
+        if cmd.os_version and cmd.os_version.strip() != "":
+            os_version = cmd.os_version.strip()
+        if cmd.re_version and cmd.re_version.strip() != "":
+            re_version = cmd.re_version.strip()
+        if cmd.img_version and cmd.img_version.strip() != "":
+            img_version = cmd.img_version.strip()
+        if hasattr(cmd, 'meta_package') and cmd.meta_package.strip() != "":
+            meta_package = cmd.meta_package.strip()
+    # 2. extract versions from environment
+    if env:
+        if not db_version and "EXA_DB_VERSION" in env:
+            db_version = env["EXA_DB_VERSION"]
+        if not os_version and "EXA_OS_VERSION" in env:
+            os_version = env["EXA_OS_VERSION"]
+        if not re_version and "EXA_RE_VERSION" in env:
+            re_version = env["EXA_RE_VERSION"]
+        if not img_version and "EXA_IMG_VERSION" in env:
+            img_version = env["EXA_IMG_VERSION"]
+        if not meta_package and "EXA_META_PACKAGE" in env:
+            meta_package = env["EXA_META_PACKAGE"]
+    # 3. extract versions from docker image
+    if image:
+        if not db_version or not os_version or not re_version or not img_version or not meta_package:
+            try:
+                dh = docker_handler.docker_handler()
+                ic = dh.get_image_conf(image)
+            except docker_handler.DockerError as e:
+                print(e)
+                sys.exit(1)
+            if not db_version:
+                db_version = ic.labels.dbversion
+            if not os_version:
+                os_version = ic.labels.osversion
+            if not re_version:
+                re_version = ic.labels.reversion
+            if not img_version:
+                img_version = ic.labels.version
+    return (db_version, os_version, re_version, img_version, meta_package)
+# }}}
+# {{{ Get versioned image name
+def get_versioned_image_name(image):
+    """
+    Replaces 'latest' in the given image name with the actual version.
+    """
+    image = image.strip()
+    if image.split(":")[1] == "latest":
+        try:
+            dh = docker_handler.docker_handler()
+            ic = dh.get_image_conf(image)
+        except docker_handler.DockerError as e:
+            print(e)
+            sys.exit(1)
+            image = image.split(":")[0] + ":" + ic.labels.version
+    return image
+# }}}
+# {{{ Init cluster
+def init_cluster(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    # check if root and license actually exist
+    if not os.path.isdir(root):
+        print("Root directory '%s' does not exist (or is a file)!" % root)
+        sys.exit(1)
+    if not os.path.isfile(cmd.license):
+        print("License '%s' does not exist (or is a directory)!" % os.path.abspath(cmd.license))
+        sys.exit(1)
+    # check params
+    if cmd.device_type and cmd.device_type not in ['block','file']:
+        print("Device-type must be 'block' or 'file'!")
+        sys.exit(1)
+    if cmd.auto_storage and cmd.device_type != 'file':
+        print("'--auto-storage' is only supported for device-type 'file'!")
+        sys.exit(1)
+    # check if has been started (i. e. containers exist)
+    if cluster_started(root):
+        print("Cluster '%s' has existing containers. It has to be stopped before it can be re-initialized!" % cmd.cluster)
+        sys.exit(1)
+    # extract versions
+    db_version, os_version, re_version, img_version, _ = extract_versions(cmd=cmd,
+                                                                       image=cmd.image)
+    # check and re-init root if requested
+    files = os.listdir(root)
+    if files:
+        if cmd.force:
+            for f in files:
+                name = os.path.join(root, f)
+                if os.path.isdir(name):
+                    shutil.rmtree(name, True)
+                else:
+                    os.unlink(name)
+        else:
+            print("Root directory '%s' is not empty! Use --force to force re-initialization." % root)
+            sys.exit(1)
+    # create EXAConf
+    try:
+        exaconf = EXAConf.EXAConf(root, False)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    # create directory structure
+    for node in range(1, cmd.num_nodes+1):
+        node_root = os.path.join(root, exaconf.node_root_prefix + str(exaconf.max_reserved_node_id + node))
+        create_node_dirs(node_root, exaconf)
+    # extract def_owner if given
+    def_owner = None
+    if cmd.def_owner:
+        try:
+            def_owner = tuple(map(int, cmd.def_owner.split(':')))
+            assert len(def_owner) == 2
+        except Exception as e:
+            print("Argument 'owner' has invalid format! Expected 'UID:GID'.")
+            sys.exit(1)
+    # initialize EXAConf
+    exaconf.initialize(cmd.cluster, cmd.image,
+                       cmd.num_nodes, cmd.device_type, cmd.force, "Docker",
+                       db_version = db_version,
+                       os_version = os_version,
+                       re_version = re_version,
+                       img_version = img_version,
+                       license = cmd.license,
+                       def_owner = def_owner)
+    # create devices and volumes if requested
+    if cmd.auto_storage:
+        try:
+            devh = device_handler.device_handler(exaconf)
+            devh.auto_create_file_devices(max_space=util.units2bytes(cmd.max_space) if cmd.max_space else None)
+        except device_handler.DeviceError as e:
+            print(e)
+            sys.exit(1)
+
+    print("Successfully initialized root directory '%s'." % root)
+# }}}
+# {{{ Init sc
+def init_sc(cmd) -> None:
+    """
+    Called from within a 'standalone-container': creates the container filesystem,
+    storage devices and EXAConf. Finally calls exainit, which continues the startup
+    process.
+    """
+    if cmd.config:
+        args = vars (cmd)
+        for k, v in args.items ():
+            if k in ['command', 'config']:
+                continue
+            if v is not None and v != parser_isc.get_default (k) and v != parser.get_default (k):
+                print (f'Sorry, --config is not supposed to work together with other arguments ({k}: {v})')
+                sys.exit (1)
+
+    do_full_init = False
+    # 1. Create /exa/etc if it does not exist
+    # --> needed in order to create an exaconf instance
+    if not os.path.exists(sc_etc):
+        log_msg("exadt:: '%s' does not exist! Doing full initialization." % sc_etc)
+        do_full_init = True
+        os.makedirs(sc_etc)
+    else:
+        log_msg("exadt:: '%s' already exists! Doing partial initialization." % sc_etc)
+
+    # 2. Determine the local IP adress
+    log_msg("exadt:: searching for the first interface with state UP")
+    first_if = util.get_first_interface(timeout=15)
+    local_ifs = util.get_all_interfaces(timeout=15, up_only=True)
+    # check if a local IP address has been specified
+    local_ip = os.environ.get('EXA_NODE_IP_ADDRESS', None)
+    if local_ip:
+        local_ip = str(ipaddr.IPNetwork(str(local_ip).strip()).ip)
+        log_msg("exadt:: using IP address '%s' for node '%s' (from env)." % (local_ip, str(cmd.node_id)))
+    elif cmd.ip_address:
+        local_ip = str(ipaddr.IPNetwork(cmd.ip_address).ip)
+        log_msg("exadt:: using IP address '%s' for node '%s' (from args)." % (local_ip, str(cmd.node_id)))
+
+    # 3. Create EXAConf (may be uninitialized)
+    try:
+        exaconf = EXAConf.EXAConf(sc_etc, False)
+    except EXAConf.EXAConfError as e:
+        log_err(e)
+        sys.exit(1)
+
+    doc_key: str = 'scope'
+    docs: list = []
+    if cmd.config:
+        try:
+            with open (cmd.config) as fd:
+                for doc in yaml.load_all (fd, yaml.SafeLoader):
+                    docs.append (doc)
+                    d = vars (cmd)
+                    for k, v in doc.items ():
+                        if k != doc_key:
+                            d.update ({k : v})
+        except Exception as e:
+            raise RuntimeError (f'Loading from {cmd.config} failed: {e}')
+
+    global sc_user, sc_group, sc_saas, sc_init_sql, sc_sys_passwd, sc_add_sys_passwd, sc_idp_config, sc_ui_domain
+    global sc_no_db, sc_no_odirect, sc_cloud_data_volume, sc_cache_volume_disk, sc_cloud_sync_volume, sc_db_params
+    if cmd.user: sc_user = cmd.user
+    if cmd.group: sc_group = cmd.group
+    if cmd.saas: sc_saas = cmd.saas
+    if cmd.init_sql: sc_init_sql = cmd.init_sql
+    if cmd.sys_passwd: sc_sys_passwd = cmd.sys_passwd
+    if cmd.add_sys_passwd: sc_add_sys_passwd = cmd.add_sys_passwd
+    if cmd.idp_config: sc_idp_config = cmd.idp_config
+    if cmd.ui_domain: sc_ui_domain = cmd.ui_domain
+    if cmd.no_db: sc_no_db = cmd.no_db
+    if cmd.no_odirect: sc_no_odirect = cmd.no_odirect
+    if cmd.cloud_data_volume: sc_cloud_data_volume = cmd.cloud_data_volume.split(":")
+    if cmd.cache_volume_disk: sc_cache_volume_disk = cmd.cache_volume_disk.split(":")
+    if cmd.cloud_sync_volume: sc_cloud_sync_volume = cmd.cloud_sync_volume.split(":", maxsplit = 6)
+    if cmd.db_params: sc_db_params = cmd.db_params
+    db_version, os_version, re_version, img_version, _ = extract_versions(cmd=cmd,
+                                                                       env=os.environ)
+
+    # 4. check compatibility before doing anything else
+    # --> the persistent volume may need to be updated
+    if exaconf.initialized():
+        (c, res) = exaconf.check_update_needed(db_version=db_version,
+                                               os_version=os_version,
+                                               re_version = re_version,
+                                               img_version = img_version)
+        if c == True:
+            print("The given docker volume is not compatible with this docker image because of the following version mismatch(es):\n%sPlease update the volume (using 'update-sc')!" % (res))
+            sys.exit(1)
+
+    # 5. Create all other directories if they don't exist
+    create_node_dirs(sc_root, exaconf)
+
+    # 6. copy license to the correct destination
+    sc_etc_lic = os.path.join(sc_etc, exaconf.license_filename)
+    if not os.path.exists(sc_etc_lic):
+        log_msg("exadt:: copying license file '%s' to '%s'" % (repr(sc_license), repr(sc_etc_lic)))
+        try: shutil.copy(sc_license, sc_etc_lic)
+        except: log_err("exadt:: copy file '%s' failed" % (repr(sc_license)))
+    else:
+        log_msg("exadt:: using license file '%s'" % repr(sc_etc_lic))
+
+    # 7. Init EXAConf
+    #    NOTE : the version numbers are taken from the environment,
+    #           the image name is not relevant and the license has already
+    #           been copied to the right place.
+    if not exaconf.initialized():
+        log_msg("exadt:: initializing EXAConf")
+        if cmd.config:
+            for doc in docs:
+                method_name = f'initialize_{doc[doc_key]}'
+                method = getattr (exaconf, method_name)
+                if callable (method):
+                    args = {k : v for k, v in doc.items () if k != doc_key}
+                    method (args)
+                else:
+                    raise RuntimeError (f'initializer {method_name} for {doc[doc_key]} is not ready in EXAConf')
+            exaconf.commit ()
+        else:
+            exaconf.initialize(sc_cluster_name, sc_image,
+                           cmd.num_nodes, sc_device_type,
+                           False, "Docker",
+                           license = os.path.join("/exa/etc/", exaconf.license_filename),
+                           db_version = db_version,
+                           os_version = os_version,
+                           img_version = img_version,
+                           add_archive_volume=False,
+                           def_owner = (sc_user, sc_group),
+                           saas = sc_saas, initial_sql = sc_init_sql,
+                           default_sys_passwd_hash = sc_sys_passwd,
+                           additional_sys_passwd_hashes = sc_add_sys_passwd,
+                           idp_config = sc_idp_config, ui_domain = sc_ui_domain,
+                           no_db = sc_no_db, no_odirect = sc_no_odirect,
+                           cloud_data_volume = sc_cloud_data_volume,
+                           cloud_sync_volume = sc_cloud_sync_volume,
+                           cache_volume_disk = sc_cache_volume_disk,
+                           quiet = True, template_mode = cmd.template, db_params = sc_db_params)
+        # Set local IP in EXAConf
+        # --> skip in 'template' mode (will probably be replaced anyway)
+        if not cmd.template:
+            # use given one (if any)
+            if local_ip:
+                local_ip_found = False
+                for curr_if in local_ifs:
+                    if local_ip == str(ipaddr.IPNetwork(curr_if[1]).ip):
+                        log_msg("exadt:: using interface '%s' with address '%s'." % (curr_if[0], curr_if[1]))
+                        try:
+                            exaconf.set_node_network(cmd.node_id, private=first_if[1])
+                            local_ip_found = True
+                            break
+                        except EXAConf.EXAConfError as e:
+                            log_err(e)
+                            sys.exit(1)
+                if not local_ip_found:
+                    log_err("exadt:: no interface found with IP address '%s'." % local_ip)
+                    sys.exit(1)
+            # use first interface in UP state (if none given)
+            else:
+                log_msg("exadt:: using interface '%s' with address '%s'." % (first_if[0], first_if[1]))
+                try:
+                    exaconf.set_node_network(cmd.node_id, private=first_if[1])
+                except EXAConf.EXAConfError as e:
+                    log_err(e)
+                    sys.exit(1)
+
+    # if EXAConf is already initialized, we compare the current local IP
+    # with the one in the EXAConf or change it (if a local address has been
+    # specified)
+    elif not cmd.template:
+        # change local IP first, if requested
+        if local_ip:
+            log_msg("exadt:: changing IP address in EXAConf to '%s'." % local_ip)
+            try:
+                exaconf.set_node_ip(cmd.node_id, private=local_ip)
+            except EXAConf.EXAConfError as e:
+                log_err(e)
+                sys.exit(1)
+        # check IP address against local interfaces ('UP' state only)
+        nodes_conf = exaconf.get_nodes()
+        if cmd.node_id in nodes_conf:
+            priv_net = nodes_conf[cmd.node_id].private_net
+            priv_net_up = False
+            for up_if in local_ifs:
+                # NOTE: we only compare the IP address (without the network mask),
+                # in order to support weird network configurations like "192.168.10.10/32"
+                # (used within Google Cloud instances)
+                if ipaddr.IPNetwork(up_if[1]).ip == ipaddr.IPNetwork(priv_net).ip:
+                    priv_net_up = True
+                    break
+            if not priv_net_up:
+                log_err("exadt::ERROR: the private interface with address '%s' either does not exist or is down."
+                        % (priv_net))
+                sys.exit(1)
+        else:
+            log_err("exadt::ERROR: can't find node ID '%s' in EXAConf." % cmd.node_id)
+            sys.exit(1)
+
+    # 8. set root password if requested
+    if cmd.root_passwd:
+        root_conf = exaconf.get_users()['root']
+        root_conf.passwd = cmd.root_passwd
+        exaconf.set_user_conf(root_conf, 'root', encode_passwd = cmd.encode_passwd)
+
+    # 9. set and export hostname
+    hostname = "n" + str(cmd.node_id)
+    nodes_conf = exaconf.get_nodes()
+    if cmd.node_id in nodes_conf:
+        hostname = nodes_conf[cmd.node_id].name
+    log_msg("exadt:: setting hostname to '%s'" % hostname)
+    os.environ['EXA_NODE_ID'] = str(cmd.node_id)
+    os.environ['HOSTNAME'] = hostname
+    subprocess.call(['/bin/hostname', hostname])
+
+    # 10. remove authentication socket if it exists
+    if os.path.exists(cos_auth_socket) and os.getpid() == 1:
+        log_msg("exadt:: removing '%s'" % cos_auth_socket)
+        os.remove(cos_auth_socket)
+
+    # 11. create storage devices
+    if do_full_init and not cmd.template:
+        log_msg("exadt:: creating EXAStorage devices")
+        try:
+            devh = device_handler.device_handler(exaconf)
+            devh.auto_create_file_devices(container_internal=True, no_odirect = sc_no_odirect)
+        except device_handler.DeviceError as e:
+            log_err(e)
+            sys.exit(1)
+
+    exaconf.commit()
+
+    # 12. call exainit
+    # --> or exit if requested
+    if cmd.template:
+        if cmd.print_conf:
+            log_msg("exadt:: template mode: printing EXAConf and exiting:\n")
+            exaconf.config.write(outfile=sys.stdout.buffer)
+        sys.exit(0)
+    else:
+        init_cmd = exaconf.get_init_cmd()
+        init_exe = f"{exacos_constants.re_path()}/bin/{init_cmd[0]}"
+        log_msg("exadt:: calling '{} {}'".format(init_exe, init_cmd[1]))
+        os.execv(init_exe, init_cmd[1])
+# }}}
+# {{{ Create node dirs
+def create_node_dirs(node_root, exaconf):
+    """
+    Creates all default directories in the given node root directory.
+    """
+    if not os.path.exists(node_root):
+        os.makedirs(node_root)
+    if not os.path.exists(os.path.join(node_root, exaconf.etc_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.etc_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.tmp_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.tmp_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.support_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.support_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.spool_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.spool_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.sync_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.sync_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.coredump_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.coredump_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.job_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.job_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.job_queue_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.job_queue_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.job_run_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.job_run_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.job_finish_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.job_finish_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.job_archive_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.job_archive_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.conf_ssl_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.conf_ssl_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.conf_dwad_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.conf_dwad_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.conf_remote_volumes_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.conf_remote_volumes_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.md_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.md_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.md_storage_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.md_storage_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.md_dwad_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.md_dwad_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.log_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.log_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.logd_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.logd_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.cored_log_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.cored_log_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.db_log_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.db_log_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.data_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.data_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.bucketfs_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.bucketfs_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.storage_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.storage_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.bucketfs_dir, exaconf.def_bucketfs)):
+        os.makedirs(os.path.join(node_root, exaconf.bucketfs_dir, exaconf.def_bucketfs))
+    if not os.path.exists(os.path.join(node_root, exaconf.docker_log_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.docker_log_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.syslog_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.syslog_dir))
+    if not os.path.exists(os.path.join(node_root, exaconf.device_pool_dir)):
+        os.makedirs(os.path.join(node_root, exaconf.device_pool_dir))
+# }}}
+# {{{ List clusters
+def list_clusters(cmd):
+    conf = exadt_conf.exadt_conf()
+    clusters = conf.get_clusters()
+    if len(clusters) == 0:
+        print("No clusters found in %s." % conf.get_conf_paths())
+        sys.exit(0)
+
+    # build dict containg all information
+    width = [len("CLUSTER"), len("ROOT"), len("IMAGE NAME"), len("IMAGE VERSION"), len("DB VERSION"), len("OS VERSION")]
+    clusters_info = config()
+    # quiet output
+    if quiet_output is True:
+        for cluster in clusters:
+            print(cluster)
+        return
+    # normal output
+    for cluster,root in clusters.items():
+        ci = config({"root" : os.path.normpath(root),
+                     "image" : "<uninitialized>",
+                     "version" : "<unknown>",
+                     "db_version" : "<unknown>",
+                     "os_version" : "<unknown>"})
+        #cluster may be uninitialized
+        try:
+            exaconf = EXAConf.EXAConf(root, True)
+            ci.image = exaconf.get_docker_image()
+        except EXAConf.EXAConfError:
+            pass
+        #query image info if it's initialized
+        if ci.image != "<uninitialized>":
+            try:
+                dh = docker_handler.docker_handler()
+                ic = dh.get_image_conf(ci.image)
+                ci.version = ic.labels.version
+                ci.db_version = ic.labels.dbversion
+                ci.os_version = ic.labels.osversion
+            except docker_handler.DockerError as e:
+                print(e)
+        clusters_info[cluster] = ci
+        # update column widths
+        width[0] = max(width[0], len(cluster))
+        width[1] = max(width[1], len(ci.root))
+        width[2] = max(width[2], len(ci.image))
+        width[3] = max(width[3], len(ci.version))
+        width[4] = max(width[4], len(ci.db_version))
+        width[5] = max(width[5], len(ci.os_version))
+
+    print(" %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], "CLUSTER",
+                                                              width[1], "ROOT",
+                                                              width[2], "IMAGE NAME",
+                                                              width[3], "IMAGE VERSION",
+                                                              width[4], "DB VERSION",
+                                                              width[5], "OS VERSION"))
+    for cluster,ci in clusters_info.items():
+        print(" %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], cluster,
+                                                                  width[1], ci.root,
+                                                                  width[2], ci.image,
+                                                                  width[3], ci.version,
+                                                                  width[4], ci.db_version,
+                                                                  width[5], ci.os_version))
+# }}}
+# {{{ Docker version
+def docker_version(cmd):
+    try:
+        dh = docker_handler.docker_handler(verbose=True)
+        print("====== Docker Version ======")
+        pp = pprint.PrettyPrinter()
+        pp.pprint(dh.version())
+        print("====== Docker-py Version ======")
+        print(docker.version)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Start cluster
+def start_cluster(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+        # Check for compatibility between the current EXAConf and the image
+        # (only done before starting a cluster because all other operations
+        # still have to work, especially the update)
+        (c, ev, iv) = exaconf.check_img_compat()
+        if c == False:
+            print("EXAConf version (%s) is not compatible with image version (%s). Please update your installation!" % (ev, iv))
+            sys.exit(1)
+        # check if the volumes all have disks assigned
+        for name,vol in exaconf.get_volumes().items():
+            if vol.disk is None:
+                print("Volume '%s' has no disk! Aborting cluster startup." % name)
+                sys.exit(1)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    # call docker handler
+    try:
+        dh = docker_handler.docker_handler(verbose=cmd.verbose)
+        dh.set_exaconf(exaconf)
+        dh.start_cluster(cmd = cmd.command)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Stop cluster
+def stop_cluster(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        dh = docker_handler.docker_handler(verbose=cmd.verbose)
+        dh.set_exaconf(exaconf)
+        # merge EXAConf right before stopping the system,
+        # just to make sure that we get the internal changes,
+        # even if the shutdown fails
+        dh.merge_exaconf(allow_self = False, force = True)
+        if dh.cluster_online():
+            drh = docker_rpc_handler.docker_rpc_handler(exaconf, quiet=True)
+            print("Stopping database(s)...", end=' ')
+            drh.stop_database()
+            print("successful")
+        dh.stop_cluster(cmd.timeout)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Update cluster
+def update_cluster(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    # check if has been started (i. e. containers exist)
+    if cluster_started(root):
+        print("Cluster '%s' has existing containers. It has to be stopped before it can be updated!" % cmd.cluster)
+        sys.exit(1)
+    # extract new versions
+    new_db_version, new_os_version, new_re_version, new_img_version, new_meta_package = extract_versions(cmd=cmd,
+                                                                                       image=cmd.image)
+    # update image and versions
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+        old_docker_image = exaconf.get_docker_image()
+        old_db_version = exaconf.get_db_version()
+        old_os_version = exaconf.get_os_version()
+        old_re_version = exaconf.get_re_version()
+        old_img_version = exaconf.get_img_version()
+        old_file_version = exaconf.get_file_version()
+        old_meta_package = exaconf.get_meta_package()
+        exaconf.update_self()
+        exaconf.update_docker_image(cmd.image)
+        exaconf.update_db_version(new_db_version)
+        exaconf.update_os_version(new_os_version)
+        exaconf.update_re_version(new_re_version)
+        exaconf.update_img_version(new_img_version)
+        exaconf.set_meta_package(new_meta_package)
+        nodes_conf = exaconf.get_nodes()
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    # create missing directories
+    for node_conf in nodes_conf.values():
+        create_node_dirs(node_conf.docker_volume, exaconf)
+    # print update info
+    col_width = len(old_docker_image)
+    print("Cluster '%s' has been successfully updated!" % cmd.cluster)
+    print("- Image name :  %-*s --> %s" % (col_width, old_docker_image, exaconf.get_docker_image()))
+    print("- Image ver. :  %-*s --> %s" % (col_width, old_img_version, exaconf.get_img_version()))
+    print("- DB ver.    :  %-*s --> %s" % (col_width, old_db_version, exaconf.get_db_version()))
+    print("- OS ver.    :  %-*s --> %s" % (col_width, old_os_version, exaconf.get_os_version()))
+    print("- RE ver.    :  %-*s --> %s" % (col_width, old_re_version, exaconf.get_re_version()))
+    print("- EXAConf    :  %-*s --> %s" % (col_width, old_file_version, exaconf.get_file_version()))
+    print("- MetaPkg    :  %-*s --> %s" % (col_width, old_meta_package, exaconf.get_meta_package()))
+    print("Restart the cluster in order to apply the changes.")
+# }}}
+# {{{ Update sc
+def update_sc(cmd):
+    """
+    Update a 'standalone-container' (called from within the running container)
+    NOTE : the image name is not modified because it is ignored anyway for standalone-containers.
+    """
+    new_db_version, new_os_version, new_re_version, new_img_version, new_meta_package = extract_versions(cmd=cmd,
+                                                                                       env=os.environ)
+    # update image and versions
+    try:
+        exaconf = EXAConf.EXAConf(sc_etc, True)
+        old_db_version = exaconf.get_db_version()
+        old_os_version = exaconf.get_os_version()
+        old_re_version = exaconf.get_re_version()
+        old_img_version = exaconf.get_img_version()
+        old_file_version = exaconf.get_file_version()
+        old_meta_package = exaconf.get_meta_package()
+        exaconf.update_self()
+        exaconf.update_db_version(new_db_version)
+        exaconf.update_os_version(new_os_version)
+        exaconf.update_re_version(new_re_version)
+        exaconf.update_img_version(new_img_version)
+        exaconf.set_meta_package(new_meta_package)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    col_width = len(old_img_version)
+    print("Container has been successfully updated!")
+    print("- Image ver. :  %-*s --> %s" % (col_width, old_img_version, exaconf.get_img_version()))
+    print("- DB ver.    :  %-*s --> %s" % (col_width, old_db_version, exaconf.get_db_version()))
+    print("- OS ver.    :  %-*s --> %s" % (col_width, old_os_version, exaconf.get_os_version()))
+    print("- RE ver.    :  %-*s --> %s" % (col_width, old_re_version, exaconf.get_re_version()))
+    print("- EXAConf    :  %-*s --> %s" % (col_width, old_file_version, exaconf.get_file_version()))
+    print("- MetaPkg    :  %-*s --> %s" % (col_width, old_meta_package, exaconf.get_meta_package()))
+# }}}
+# {{{ ps
+def ps(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        dh = docker_handler.docker_handler()
+        dh.set_exaconf(exaconf)
+        containers = dh.get_containers()
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+    # not running?
+    if len(containers) == 0:
+        print("No containers found for cluster '%s'." % cmd.cluster)
+        sys.exit(0)
+    # verbose output
+    if cmd.verbose:
+        pprint.pprint(containers)
+    # create list containing the column widths (use max. len of each column entry)
+    width = [0] * 7
+    width[0] = max(max(len(c['Labels']['NodeID']) for c in containers), len("NODE_ID"))
+    width[1] = max(max(len(c['Status']) for c in containers), len("STATUS"))
+    width[2] = max(max(len(c['Labels']['version']) for c in containers), len("IMAGE VERSION"))
+    width[3] = max(max(len(c['Labels']['Name']) for c in containers), len("NAME"))
+    width[4] = 12
+    width[5] = max(max(len(c['Names'][0].lstrip("/")) for c in containers), len("CONTAINER NAME"))
+    width[6] = 0
+    for c in containers:
+        ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if 'PublicPort' in d]
+        ports_str = ",".join(f"{pub}->{priv}" for pub, priv in ports)
+        if len(ports_str) > width[6]:
+            width[6] = len(ports_str)
+    width[6] = max(width[6], len("EXPOSED PORTS"))
+
+    print(" %- *s   %- *s   %- *s   %- *s   %- *s   %- *s   %- *s" % (width[0], "NODE ID",
+                                                                      width[1], "STATUS",
+                                                                      width[2], "IMAGE VERSION",
+                                                                      width[3], "NAME",
+                                                                      width[4], "CONTAINER ID",
+                                                                      width[5], "CONTAINER NAME",
+                                                                      width[6], "EXPOSED PORTS"))
+    for c in containers:
+        ports = [ (d["PublicPort"], d["PrivatePort"]) for d in c['Ports'] if 'PublicPort' in d]
+        ports_str = ",".join(f"{pub}->{priv}" for pub, priv in ports)
+        print(" %- *s   %- *s   %- *s   %- *s   %- .*s   %- *s   %- *s" % (width[0], c['Labels']['NodeID'],
+                                                                           width[1], c['Status'],
+                                                                           width[2], c['Labels']['version'],
+                                                                           width[3], c['Labels']['Name'],
+                                                                           width[4], c['Id'],
+                                                                           width[5], c['Names'][0].lstrip("/"),
+                                                                           width[6], ports_str))
+# }}}
+# {{{ Create file devices
+def create_file_devices(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        byte_size = util.units2bytes(cmd.size)
+    except RuntimeError as e:
+        print("ERROR:: %s" % e)
+        sys.exit(1)
+    # check if path does exist (do NOT create it)
+    if cmd.path and not os.path.exists(cmd.path):
+        print("ERROR:: Given path '%s' does not exist!" % cmd.path)
+        sys.exit(1)
+    # ask user for confirmation if existing devices should be replaced
+    if cmd.replace and not confirm("Do you really want to replace all file-devices of cluster '%s'?" % cmd.cluster):
+        print("Aborted")
+        sys.exit(0)
+    try:
+        devh = device_handler.device_handler(exaconf)
+        devices = devh.create_file_devices(cmd.disk, cmd.num, byte_size, cmd.path, cmd.replace)
+    except device_handler.DeviceError as e:
+        print(e)
+        sys.exit(1)
+    if devices:
+        if len(devices[1]) > 0:
+            print("The following file devices have been removed:")
+            for nid in list(devices[1].keys()):
+                print("Node %s : %s" % (nid, devices[1][nid]))
+        if len(devices[0]) > 0:
+            print("Successfully created the following file devices:")
+            for nid in list(devices[0].keys()):
+                print("Node %s : %s" % (nid, devices[0][nid]))
+# }}}
+# {{{ execute
+def execute(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        dh = docker_handler.docker_handler()
+        dh.set_exaconf(exaconf)
+        dh.execute(cmd.command, all=cmd.all, quiet=quiet_output)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Stop database
+def stop_database(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        drh = docker_rpc_handler.docker_rpc_handler(exaconf)
+        if cmd.kill:
+            drh.kill_database(cmd.name)
+        else:
+            drh.stop_database(cmd.name)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Start database
+def start_database(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        drh = docker_rpc_handler.docker_rpc_handler(exaconf)
+        drh.start_database(cmd.name)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ List databases
+def list_databases(cmd):
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        exaconf = EXAConf.EXAConf(root, True)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    try:
+        drh = docker_rpc_handler.docker_rpc_handler(exaconf)
+        drh.list_databases(short=cmd.short)
+    except docker_handler.DockerError as e:
+        print(e)
+        sys.exit(1)
+# }}}
+# {{{ Print version
+def print_version(cmd):
+    print(my_version)
+# }}}
+# {{{ Collect info
+def collect_info(cmd):
+    """
+    Creates an archive (tgz) with the following content:
+        - 'exadt.info' : exadt version + MD5 sum of the executable
+        - 'docker.info' : Docker version numbers
+        - 'image.info' : output of 'docker inspect' for the associated Docker image
+        - 'containers.info' : output of 'docker inspect' for all containers of the given cluster
+        - '$node_id/etc/' : content of each containers 'etc' directory
+        - '$node_id/logs/ : content of each containers 'logs' directory
+    """
+    def get_bytesio_obj (content):
+        obj = None
+        if isinstance (content, str):
+            obj = BytesIO (content.encode ())
+        else:
+            try:
+                obj = BytesIO (content)
+            except Exception as e:
+                print ('Constructing a byteio object failed: %s' % e)
+        return obj
+
+    err = False
+    # determine cluster root
+    # --> exit ONLY if cluster does not exist (continue on all other errors)
+    try:
+        conf = exadt_conf.exadt_conf()
+        root = conf.get_root(cmd.cluster)
+    except exadt_conf.ConfError as e:
+        print(e)
+        sys.exit(1)
+    # determine exadt version and MD5 sum
+    script = get_script_path()
+    script_md5 = util.md5(script)
+    # get docker information
+    try:
+        dh = docker_handler.docker_handler(verbose=True)
+        pp = pprint.PrettyPrinter()
+        docker_info = pp.pformat(dh.version())
+    except Exception as e:
+        print(e)
+        err = True
+    # parse EXAConf
+    try:
+        exaconf = EXAConf.EXAConf(root, False)
+    except EXAConf.EXAConfError as e:
+        print(e)
+        sys.exit(1)
+    # EXAConf may be un-inititalized
+    image_info = None
+    container_info = None
+    initialized = False
+    if not exaconf.initialized():
+        print("Cluster '%s' has not been initialized." % cmd.cluster)
+    else:
+        initialized = True
+        dh.set_exaconf(exaconf)
+        # collect image information
+        try:
+            image_info = pprint.pformat(dh.inspect_image(exaconf.get_docker_image()))
+        except Exception as e:
+            print(e)
+            err = True
+        # collect container information
+        try:
+            container_info = pprint.pformat(dh.inspect_containers())
+        except Exception as e:
+            print(e)
+            err = True
+        # save docker logs
+        try:
+            dh.save_logs()
+        except Exception as e:
+            print(e)
+            err = True
+
+    # create archive
+    with tarfile.open(cmd.outfile, mode="w:gz") as tar:
+        # exadt info
+        exa_info = ("Version: %s, MD5 : %s" % (my_version, script_md5)).encode("utf-8")
+        te = tarfile.TarInfo(os.path.join(info_arc_prefix, "exadt.info"))
+        te.size = len(exa_info)
+        te.mtime = time.time()
+        tar.addfile(te, get_bytesio_obj(exa_info))
+        # docker info
+        td = tarfile.TarInfo(os.path.join(info_arc_prefix, "docker.info"))
+        td.size = len(docker_info)
+        td.mtime = time.time()
+        tar.addfile(td, get_bytesio_obj(docker_info))
+        # image info
+        if image_info:
+            ti = tarfile.TarInfo(os.path.join(info_arc_prefix, "image.info"))
+            ti.size = len(image_info)
+            ti.mtime = time.time()
+            tar.addfile(ti, get_bytesio_obj(image_info))
+        # container info
+        if container_info:
+            tc = tarfile.TarInfo(os.path.join(info_arc_prefix, "containers.info"))
+            tc.size = len(container_info)
+            tc.mtime = time.time()
+            tar.addfile(tc, get_bytesio_obj(container_info))
+        # add "/logs" and "/etc" directories
+        if initialized:
+            nodes_conf = exaconf.get_nodes()
+            for nid, conf in nodes_conf.items():
+                # logs
+                try:
+                    tar.add(os.path.join(conf.docker_volume, "logs"),
+                            arcname = os.path.join(info_arc_prefix, "n" + str(nid), "logs"))
+                except Exception as e:
+                    print(e)
+                    err = True
+                # etc
+                # -> contains root-only-readable files, so we do it manually
+                for base, dirs, files in os.walk(os.path.join(conf.docker_volume, "etc")):
+                    for f in files:
+                        try:
+                            tar.add(os.path.join(base, f),
+                                    arcname = os.path.join(info_arc_prefix,
+                                                           "n"+str(nid),
+                                                           os.path.relpath(base, conf.docker_volume),
+                                                           f)
+                                   )
+                        except IOError:
+                            pass
+                    for d in dirs:
+                        try:
+                            tar.add(os.path.join(base, d),
+                                    arcname = os.path.join(info_arc_prefix,
+                                                           "n"+str(nid),
+                                                           os.path.relpath(base, conf.docker_volume),
+                                                           d),
+                                    recursive = False
+                                   )
+                        except IOError:
+                            pass
+        tar.close()
+
+    print("All available information has been saved to '%s'.%s" % (cmd.outfile, "Some information could not be retrieved!" if err else ""))
+# }}}
+# {{{ Main
+def main():
+    global confirm_yes
+    global quiet_output
+    global parser_isc, parser
+
+    parser = argparse.ArgumentParser(
+            description = 'EXASOL Docker Tool',
+            prog = 'exadt')
+    parser.add_argument(
+            '--yes', '-y',
+            action='store_true',
+            default=False,
+            help='Do not ask for confirmations')
+    parser.add_argument(
+            '--quiet', '-q',
+            action='store_true',
+            default=False,
+            help='Less verbose output (for some commands)')
+    cmdparser = parser.add_subparsers(
+            dest = 'command',
+            title = 'commands',
+            description = 'supported commands')
+    cmdparser.required = True
+
+    # create cluster command
+    parser_cc = cmdparser.add_parser(
+            'create-cluster',
+            help='Create a new cluster')
+    parser_cc.add_argument(
+            'cluster', type=str, metavar='NAME',
+            help='Name for the new cluster')
+    parser_cc.add_argument(
+            '--root', '-r',
+            required = True,
+            help='Root directory for the new cluster')
+    parser_cc.add_argument(
+            '--create-root', '-c',
+            action = 'store_true',
+            help='Create root directory if it does not exist')
+    parser_cc.set_defaults(func=create_cluster)
+
+    # delete cluster command
+    parser_dc = cmdparser.add_parser(
+            'delete-cluster',
+            help='Delete an existing cluster from the config (and clear data in its root directory)')
+    parser_dc.add_argument(
+            'cluster', type=str, metavar='CLUSTER',
+            help='Name of the cluster')
+    parser_dc.add_argument(
+            '--keep-root', '-k',
+            action = 'store_true',
+            help='Keep root directory and contents (default: delete it)')
+    parser_dc.add_argument(
+            '--keep-mapped-devices', '-d',
+            action = 'store_true',
+            help='Keep mapped devices, i. e. file-devices outside of the root directory (default: delete them)')
+    parser_dc.set_defaults(func=delete_cluster)
+
+    # init cluster command
+    parser_ic = cmdparser.add_parser(
+            'init-cluster',
+            help='Initialize the configuration and directory structure of a cluster')
+    parser_ic.add_argument(
+            'cluster', type=str, metavar='CLUSTER',
+            help='Name of the cluster')
+    parser_ic.add_argument(
+            '--image', '-i',
+            required = True,
+            help='Docker image to use')
+    parser_ic.add_argument(
+            '--num-nodes', '-m',
+            type = int,
+            default = 1,
+            help = 'Nr. of nodes (i. e. containers, default: 1)')
+    parser_ic.add_argument(
+            '--license', '-l',
+            required = True,
+            help = 'Path to the license file')
+    parser_ic.add_argument(
+            '--device-type', '-d',
+            type = str,
+            default = 'file',
+            help = 'Type of EXAStorage device (block | file)')
+    parser_ic.add_argument(
+            '--auto-storage', '-a',
+            action = 'store_true',
+            help = "Automatically create file-devices, disks and volumes (requires sufficient free space in the root directory and only works for device-type 'file')")
+    parser_ic.add_argument(
+            '--max-space', '-M',
+            type=str,
+            help="Max. space to be used by --auto-storage (e.g. '20GiB').")
+    parser_ic.add_argument(
+            '--db-version', '-D',
+            type = str,
+            help='Database version number (necessary if image contains multiple database installations)')
+    parser_ic.add_argument(
+            '--os-version', '-O',
+            type = str,
+            help='EXAClusterOS version number')
+    parser_ic.add_argument(
+            '--re-version', '-R',
+            type = str,
+            help='EXARuntime version number')
+    parser_ic.add_argument(
+            '--img-version', '-I',
+            type = str,
+            help='Image version number')
+    parser_ic.add_argument(
+            '--def-owner', '-o',
+            type = str,
+            help="Default owner of all cluster services, specified as 'UID:GID' (default: current 'uid:gid').")
+    parser_ic.add_argument(
+            '--force', '-f',
+            action = 'store_true',
+            help='Force re-initialization of the root directory (if not empty)')
+    parser_ic.set_defaults(func=init_cluster)
+
+    # init-sc command
+    parser_isc = cmdparser.add_parser(
+            'init-sc',
+            help='Initialize the container of a self-contained image.')
+    parser_isc.add_argument(
+            '--template', '-t',
+            default = False,
+            action = 'store_true',
+            help="Create an EXAConf template and exit (also prepares '/exa').")
+    parser_isc.add_argument(
+            '--no-db',
+            default = False,
+            action = 'store_true',
+            help='Do not include a DB in the system.')
+    parser_isc.add_argument(
+            '--no-odirect',
+            default = False,
+            action = 'store_true',
+            help='Deactivate O_DIRECT in storage.')
+    parser_isc.add_argument(
+            '--print-conf', '-p',
+            default = False,
+            action = 'store_true',
+            help='Print the EXAConf to stdout (in template mode).')
+    parser_isc.add_argument(
+            '--node-id', '-i',
+            type = str,
+            default = '11',
+            help='Node ID of the current container.')
+    parser_isc.add_argument(
+            '--ip-address', '-a',
+            type = str,
+            help='private IP address for the container.')
+    parser_isc.add_argument(
+            '--num-nodes', '-n',
+            type = int,
+            default = 1,
+            help='Number of cluster nodes.')
+    parser_isc.add_argument(
+            '--root-passwd', '-r',
+            type = str,
+            required = False,
+            help="Password for user root (add '-e' if not encoded).")
+    parser_isc.add_argument(
+            '--encode-passwd', '-e',
+            action='store_true',
+            required = False,
+            help = "Encode the given cleartext password as a SHA512 hash value (like in /etc/shadow).")
+    parser_isc.add_argument(
+            '--img-version', '-I',
+            type = str,
+            help='Version number of the new Docker image.')
+    parser_isc.add_argument(
+            '--db-version', '-D',
+            type = str,
+            help='DB version number.')
+    parser_isc.add_argument(
+            '--os-version', '-O',
+            type = str,
+            help='EXAClusterOS version number.')
+    parser_isc.add_argument(
+            '--re-version', '-R',
+            type = str,
+            help='EXARuntime version number.')
+    parser_isc.add_argument(
+            '--user', '-u',
+            type = int,
+            help='User ID that should own the generated files (default: %i).' % sc_user)
+    parser_isc.add_argument(
+            '--group', '-g',
+            type = int,
+            help='Group ID that should own the generated files (default: %i).' % sc_group)
+    parser_isc.add_argument(
+            '--saas', '-S',
+            action = 'store_true',
+            help='Enable SaaS features (default: disabled)')
+    parser_isc.add_argument(
+            '--init-sql',
+            type = str,
+            help='Path to SQL file for database initialisation.')
+    parser_isc.add_argument(
+            '--sys-passwd',
+            type = str,
+            help='Hash to set as default SYS password as hash.')
+    parser_isc.add_argument(
+            '--add-sys-passwd',
+            type = str,
+            help='Additional hashes to authorize SYS user.')
+    parser_isc.add_argument(
+            '--idp-config',
+            type = str,
+            help='Base64 encoded configuration for external identity provider')
+    parser_isc.add_argument(
+            '--db-params',
+            type = str,
+            help='params used by the default database')
+    parser_isc.add_argument(
+            '--ui-domain',
+            type = str,
+            help='UI domain name')
+    parser_isc.add_argument(
+            '--cloud-data-volume',
+            type = str,
+            help='Cloud data volume configuration: s3:<region>:<bucket>:[prefix]:[threads]:[conns]:[endpoint]')
+    parser_isc.add_argument(
+            '--cloud-sync-volume',
+            type = str,
+            help='Cloud snapshot sync volume configuration: s3:<region>:<bucket>:[prefix]:[threads]:[conns]:[endpoint]')
+    parser_isc.add_argument(
+            '--cache-volume-disk',
+            type = str,
+            help='Cache volume disk configuration')
+    parser_isc.add_argument(
+            '--config',
+            type = str,
+            help='using a configuration to initialize (supercede other commandline args)')
+    parser_isc.set_defaults(func=init_sc)
+
+    # list clusters command
+    parser_lc = cmdparser.add_parser(
+            'list-clusters',
+            help='List all existing clusters and their root directory')
+    parser_lc.set_defaults(func=list_clusters)
+
+    # update cluster command
+    parser_upc = cmdparser.add_parser(
+            'update-cluster',
+            help='Update given cluster (by changing the docker image)')
+    parser_upc.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster to be updated')
+    parser_upc.add_argument(
+            '--image', '-i',
+            required=True,
+            help='Name of the new Docker image')
+    parser_upc.add_argument(
+            '--db-version', '-D',
+            type = str,
+            help='DB version number')
+    parser_upc.add_argument(
+            '--os-version', '-O',
+            type = str,
+            help='OS version number')
+    parser_upc.add_argument(
+            '--re-version', '-R',
+            type = str,
+            help='EXARuntime version number')
+    parser_upc.add_argument(
+            '--img-version', '-I',
+            type = str,
+            help='Version number of the new Docker image')
+    parser_upc.set_defaults(func=update_cluster)
+
+    # update-sc command
+    parser_usc = cmdparser.add_parser(
+            'update-sc',
+            help='Update the container of a self-contained image')
+    parser_usc.add_argument(
+            '--img-version', '-I',
+            type = str,
+            help='Version number of the new Docker image')
+    parser_usc.add_argument(
+            '--db-version', '-D',
+            type = str,
+            help='DB version number')
+    parser_usc.add_argument(
+            '--os-version', '-O',
+            type = str,
+            help='OS version number')
+    parser_usc.add_argument(
+            '--re-version', '-R',
+            type = str,
+            help='EXARuntime version number')
+    parser_usc.set_defaults(func=update_sc)
+
+    # start cluster command
+    parser_sc = cmdparser.add_parser(
+            'start-cluster',
+            help='Start given cluster')
+    parser_sc.add_argument(
+            'cluster', type=str, metavar='CLUSTER',
+            help='Name of the cluster to be started')
+    parser_sc.add_argument(
+            '--command', '-c',
+            help="Custom start command for all containers (set as 'entrypoint')")
+    parser_sc.add_argument(
+            '--verbose', '-V',
+            action = 'store_true',
+            help='Increase output')
+    parser_sc.set_defaults(func=start_cluster)
+
+    # stop cluster command
+    parser_stc = cmdparser.add_parser(
+            'stop-cluster',
+            help='Stop given cluster')
+    parser_stc.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster to be stopped')
+    parser_stc.add_argument(
+            '--timeout', '-t',
+            default=60,
+            help='Seconds to wait for a container to stop before sending SIGKILL (default: 60s)')
+    parser_stc.add_argument(
+            '--verbose', '-V',
+            action = 'store_true',
+            help='Increase output')
+    parser_stc.set_defaults(func=stop_cluster)
+
+    # ps command
+    parser_psc = cmdparser.add_parser(
+            'ps',
+            help='List all containers of the given cluster')
+    parser_psc.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_psc.add_argument(
+            '--verbose', '-V',
+            action = 'store_true',
+            help='Dump all container info from docker')
+    parser_psc.set_defaults(func=ps)
+
+    # create file devices command
+    parser_cfdc = cmdparser.add_parser(
+            'create-file-devices',
+            help='Create files as storage devices for all nodes of the given cluster')
+    parser_cfdc.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_cfdc.add_argument(
+            '--num', '-n',
+            type = int,
+            default = 1,
+            help='Nr. of devices (per node) to be created')
+    parser_cfdc.add_argument(
+            '--size', '-s',
+            required = True,
+            type = str,
+            help='Size of a device file')
+    parser_cfdc.add_argument(
+            '--disk', '-d',
+            type = str,
+            default = "default",
+            help="Storage disk to which the device should be added (default: 'default')")
+    parser_cfdc.add_argument(
+            '--path', '-p',
+            type=str,
+            help='Create device-files in given directory instead of default directory')
+    parser_cfdc.add_argument(
+            '--replace', '-r',
+            action='store_true',
+            help='Replace existing file-devices instead of adding them')
+    parser_cfdc.set_defaults(func=create_file_devices)
+
+    # docker version command
+    parser_dv = cmdparser.add_parser(
+            'docker-version',
+            help='Print docker version information')
+    parser_dv.set_defaults(func=docker_version)
+
+    # exec command
+    parser_ex = cmdparser.add_parser(
+            'exec',
+            help='Execute the given command on a running container of the given cluster')
+    parser_ex.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_ex.add_argument(
+            '--command', '-c',
+            help='Command to be executed')
+    parser_ex.add_argument(
+            '--all', '-a',
+            action='store_true',
+            help='Execute the given command on all running containers')
+    parser_ex.set_defaults(func=execute)
+
+    # start-db command
+    parser_sadb = cmdparser.add_parser(
+            'start-db',
+            help='Start all databases (or the given one) in the given cluster')
+    parser_sadb.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_sadb.add_argument(
+            '--name', '-n',
+            type=str,
+            default="all",
+            help='Database to be started')
+    parser_sadb.set_defaults(func=start_database)
+
+    # stop-db command
+    parser_stdb = cmdparser.add_parser(
+            'stop-db',
+            help='Stop all databases (or the given one) in the given cluster')
+    parser_stdb.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_stdb.add_argument(
+            '--name', '-n',
+            type=str,
+            default="all",
+            help='Database to be stopped')
+    parser_stdb.add_argument(
+            '--kill', '-k',
+            action='store_true',
+            default=False,
+            help='Force-stop DB immediately')
+    parser_stdb.set_defaults(func=stop_database)
+
+    # list-dbs command
+    parser_lsdb = cmdparser.add_parser(
+            'list-dbs',
+            help='List all databases in the given cluster')
+    parser_lsdb.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_lsdb.add_argument(
+            '--short', '-s',
+            action='store_true',
+            default=False,
+            help='Short listing (only names)')
+    parser_lsdb.set_defaults(func=list_databases)
+
+    # version command
+    parser_ver = cmdparser.add_parser(
+            'version',
+            help='Print exadt version number')
+    parser_ver.set_defaults(func=print_version)
+
+    # exaconf command
+    parser_exaconf = cmdparser.add_parser(
+            'exaconf',
+            help="Execute 'exaconf' with the given arguments.")
+    parser_exaconf.add_argument(
+            '--args', '-a',
+            type=str,
+            required=True,
+            help="Arguments for 'exaconf' (as a single string).")
+    parser_exaconf.set_defaults(func=call_exaconf)
+
+    # collect-info command
+    parser_cl = cmdparser.add_parser(
+            'collect-info',
+            help='Collect log output and debugging information')
+    parser_cl.add_argument(
+            'cluster', type=str, metavar="CLUSTER",
+            help='Name of the cluster')
+    parser_cl.add_argument(
+            '--outfile', '-o',
+            type=str,
+            default="./exasol_info.tgz",
+            help='Name of the output file')
+    parser_cl.set_defaults(func=collect_info)
+
+    command = parser.parse_args()
+    if command.yes: confirm_yes = True
+    if command.quiet: quiet_output = True
+    command.func(command)
+
+if __name__ == '__main__':
+    main()
+# }}}
