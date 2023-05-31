@@ -5,6 +5,8 @@ This repository contains a dockerized version of the Exasol DB for testing purpo
 
 The dockerized version of Exasol in this repository can be used with up to 10GiB of data. If you need more please get in contact with us via https://exasol.com/get-in-touch.
 
+Your use of this repository is subject to the [Exasol Terms & Conditions](https://www.exasol.com/terms-and-conditions)
+
 ###### Please note that this is an open source project which is *not officially supported* by Exasol. We will try to help you as much as possible, but can't guarantee anything since this is not an official Exasol product.
 
 Currently supported features:
