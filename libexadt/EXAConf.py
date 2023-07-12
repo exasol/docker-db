@@ -350,6 +350,7 @@ class EXAConf(object):
     def_device_type = "block"
     def_c4socket = "/var/run/c4_socket"
     def_timezone = "Europe/Berlin"
+    def_legacy_platform_manager = True
     def_slc_globs = ['/opt/exasol/slc-*/ScriptLanguages*']
     def_resolv_filename = "/etc/resolv.conf"
     def_hosts_filename = "/etc/hosts"
@@ -1096,6 +1097,7 @@ class EXAConf(object):
         glob_sec["NameServers"] = "8.8.8.8"
         glob_sec["C4Socket"] = self.def_c4socket
         glob_sec["Timezone"] = self.def_timezone
+        glob_sec["LegacyPlatformManager"] = self.def_legacy_platform_manager
         glob_sec["LicenseRAWMEMWarnThreshold"] = self.def_license_rawmem_threshold
         glob_sec["Hugepages"] = self.def_hugepages
         glob_sec["StorageConnectionThreads"] = self.def_conn_threads
@@ -1655,10 +1657,14 @@ class EXAConf(object):
             node_sec["Disk : disk1"] = {"Devices" : "dev.1 #'dev.1' must be located in '%s'" % os.path.join(self.container_root, self.storage_dir)}
             if no_odirect:
                 node_sec["Disk : disk1"]["DirectIO"] = "False"
-        if self.platform_is("AWS"):
-            node_sec["UUID"] = f"{self.config['AWS']['ID'].upper().replace('-', '')}{node_id:08d}" if UUID is None else UUID
+
+        # FIXME: this should be made cloud-agnostic
+        for platform in ["AWS", "GCP"]:
+            if self.platform_is(platform):
+                node_sec["UUID"] = f"{self.config[platform]['ID'].upper().replace('-', '')}{node_id:08d}" if UUID is None else UUID
+
         # Docker specific options:
-        elif self.platform_is("Docker"):
+        if self.platform_is("Docker"):
             node_sec["UUID"] = gen_node_uuid() if UUID is None else UUID
             node_sec["DockerVolume"] = "n" + str(node_id)
             node_sec["ExposedPorts"] = str(self.def_db_port) + ":" + str(self.def_db_port + node_id)
@@ -3666,6 +3672,13 @@ class EXAConf(object):
         else:
             return self.def_timezone
 
+    # }}}
+    # {{{ Get LegacyPlatformManager
+    def get_legacy_platform_manager(self):
+        if self.has_tree(self.config, ["Global", "LegacyPlatformManager"]):
+            return self.config["Global"].as_bool("LegacyPlatformManager")
+        else:
+            return self.def_legacy_platform_manager
     # }}}
     # {{{ Get SLC (script language container)
 
