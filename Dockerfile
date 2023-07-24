@@ -31,22 +31,22 @@ RUN yum --disablerepo=epel -y update ca-certificates && \
     rlwrap 
 
 LABEL name="EXASOL DB Docker Image"  \
-      version="7.1.21" \
-      dbversion="7.1.21" \
-      osversion="7.1.21" \
-      reversion="7.1.21" \
+      version="7.1.22" \
+      dbversion="7.1.22" \
+      osversion="7.1.22" \
+      reversion="7.1.22" \
       license="Proprietary" \
       vendor="EXASOL AG"
 
 
 COPY license/license.xml     /.license.xml
-ADD EXAClusterOS-7.1.21_LS-DOCKER-CentOS-7.5.1804_x86_64.tar.gz              /
-ENV PATH=/usr/opt/EXASuite-7/EXAClusterOS-7.1.21/bin:/usr/opt/EXASuite-7/EXAClusterOS-7.1.21/sbin:/usr/opt/EXASuite-7/EXARuntime-7.1.21/bin:/usr/opt/EXASuite-7/EXARuntime-7.1.21/sbin:/usr/opt/EXASuite-7/EXASolution-7.1.21/bin/Console:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    MANPATH=/usr/opt/EXASuite-7/EXAClusterOS-7.1.21/man:/usr/local/share/man:/usr/share/man \
-    EXA_IMG_VERSION="7.1.21" \
-    EXA_DB_VERSION="7.1.21" \
-    EXA_OS_VERSION="7.1.21" \
-    EXA_RE_VERSION="7.1.21" 
+ADD EXAClusterOS-7.1.22_LS-DOCKER-CentOS-7.5.1804_x86_64.tar.gz              /
+ENV PATH=/usr/opt/EXASuite-7/EXAClusterOS-7.1.22/bin:/usr/opt/EXASuite-7/EXAClusterOS-7.1.22/sbin:/usr/opt/EXASuite-7/EXARuntime-7.1.22/bin:/usr/opt/EXASuite-7/EXARuntime-7.1.22/sbin:/usr/opt/EXASuite-7/EXASolution-7.1.22/bin/Console:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    MANPATH=/usr/opt/EXASuite-7/EXAClusterOS-7.1.22/man:/usr/local/share/man:/usr/share/man \
+    EXA_IMG_VERSION="7.1.22" \
+    EXA_DB_VERSION="7.1.22" \
+    EXA_OS_VERSION="7.1.22" \
+    EXA_RE_VERSION="7.1.22" 
 
-ENTRYPOINT ["/usr/opt/EXASuite-7/EXAClusterOS-7.1.21/docker/entrypoint.sh"]
+ENTRYPOINT ["/usr/opt/EXASuite-7/EXAClusterOS-7.1.22/docker/entrypoint.sh"]
 CMD ["init-sc"]
