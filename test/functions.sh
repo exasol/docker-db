@@ -33,3 +33,17 @@ wait_db() {
     return 0
 }
  
+wait_confd() {
+    cd "$1"
+
+    echo "waiting for confd to become available"
+    local timeout=0
+    while [[ -z $("$PIPENV" run ./exadt exec -c "confd_client -c ping" "$2" | grep "pong") ]]
+    do
+        let timeout+=3
+        [[ ${timeout} -gt 90 ]] && exit 3
+        sleep 3
+    done
+
+    return 0
+}

@@ -628,6 +628,10 @@ class EXAConf(object):
                 if "REVersion" in self.config["Global"].scalars:
                     del self.config["Global"]["REVersion"]
 
+            if EXAVersion(conf_version) < EXAVersion("8.29.0"):
+                if self.config["Global"]["LicenseFile"] == "/exa/etc/license.xml":
+                    self.config["Global"]["LicenseFile"] = PurePath(self.container_root) / self.etc_dir / self.license_filename
+
             # always increase version number
             self.config["Global"]["ConfVersion"] = self.version
             self.commit()
