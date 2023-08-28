@@ -1,4 +1,4 @@
-#!/opt/exasol/cos-8.35.0/bin/python3
+#!/opt/exasol/cos-8.36.0/bin/python3
 
 import sys
 from libexadt.cli.exaconf import main
