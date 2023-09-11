@@ -9,8 +9,8 @@ from libexadt.EXAConf import config
 # Flush STDOUT continuously
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 
-my_version = "7.1.22"
-exaconf="/usr/opt/EXASuite-7/EXAClusterOS-7.1.22/bin/exaconf"
+my_version = "7.1.23"
+exaconf="/usr/opt/EXASuite-7/EXAClusterOS-7.1.23/bin/exaconf"
 info_arc_prefix = "exasol_docker_info"
 confirm_yes = False
 quiet_output = False
