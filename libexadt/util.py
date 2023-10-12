@@ -140,14 +140,15 @@ def bytes2units(num) -> str: # {{{
 # }}}
  
 # {{{ str_to_seconds
-seconds_in_minute = 60
-seconds_in_hour = seconds_in_minute * 60
-seconds_in_day = seconds_in_hour * 24
-seconds_in_week = seconds_in_day * 7
-def str2sec(data):
+seconds_in_minute: int = 60
+seconds_in_hour: int = seconds_in_minute * 60
+seconds_in_day: int = seconds_in_hour * 24
+seconds_in_week: int = seconds_in_day * 7
+def str2sec(data) -> int:
     if data == None:
         return 0
     # check if it's already an integer
+    seconds: int
     try:
         seconds = int(data)
         return seconds

@@ -294,8 +294,11 @@ class EXAConf(object):
     device_pool_dir = "sys/devices"
     node_uuid = "etc/node_uuid"
     valid_platforms = ('docker', 'vm', 'aws', 'azure', )
+    # platforms for which we provide a platform-manager (with
+    # operations like creating, deleting and scaling instances)
+    managed_platforms = ('aws',)
     valid_vol_types = ('data', 'archive', 'remote', 'object', )
-    valid_remote_vol_types = ('smb', 'ftp', 's3', 'file', 'gs', 'azure')
+    valid_remote_vol_types = ('smb', 'ftp', 'sftp', 'webhdfs', 'webdav', 'file', 's3', 'gs', 'azure')
     valid_object_vol_types = ('s3', 'gs', 'azure')
     remote_vol_id_offset = 10000
     docker_logs_filename = "docker_logs"
@@ -954,6 +957,15 @@ class EXAConf(object):
         Checks if the given platform is in the list of valid platforms.
         """
         return platform.lower() in self.valid_platforms
+
+    # }}}
+    def platform_managed(self, platform: Optional[str] = None) -> bool:
+        """
+        Checks if the given platform is in the list of managed platforms.
+        """
+        if platform is None:
+            platform = self.get_platform()
+        return platform.lower() in self.managed_platforms
 
     # }}}
     # {{{ Is initialized
@@ -3648,11 +3660,11 @@ class EXAConf(object):
     # }}}
     # {{{ Get platform
 
-    def get_platform(self):
+    def get_platform(self) -> str:
         """
         Returns the platform of the current EXAConf.
         """
-        return self.config["Global"]["Platform"]
+        return str(self.config["Global"]["Platform"])
 
     # }}}
     # {{{ Platform is
@@ -4784,7 +4796,7 @@ class EXAConf(object):
                             'month' : ba_sec['Month'],
                             'weekday' : ba_sec['Weekday']})
                         conf.backups[self.get_section_id(section)] = backup_conf
-                    if self.is_snapshot_backup(section):
+                    elif self.is_snapshot_backup(section):
                         ba_sec = db_sec[section]
                         if 'snapshot_backups' not in conf:
                             conf['snapshot_backups'] = config()
@@ -4797,6 +4809,19 @@ class EXAConf(object):
                             'month' : ba_sec['Month'],
                             'weekday' : ba_sec['Weekday']})
                         conf.snapshot_backups[self.get_section_id(section)] = snapshot_backup_conf
+                    elif section == 'Kerberos':
+                        kerberos_sec = db_sec['Kerberos']
+                        conf['kerberos'] = config()
+                        conf.kerberos.keytab = kerberos_sec['Keytab']
+
+                        kerberos_host = kerberos_sec.get('Host')
+                        if kerberos_host: conf.kerberos.host = kerberos_host
+
+                        kerberos_realm = kerberos_sec.get('Realm')
+                        if kerberos_realm: conf.kerberos.realm = kerberos_realm
+
+                        kerberos_service = kerberos_sec.get('Service')
+                        if kerberos_service: conf.kerberos.service = kerberos_service
 
                 # add current database
                 db_configs[db_name] = conf
@@ -5722,3 +5747,32 @@ class EXAConf(object):
 
     def set_cored_subnets(self, subnets: str) -> None:
         self.config["Global"]["CoredSubnets"] = subnets
+
+
+    def set_kerberos(self, db_name: str, host: Optional[str] = None, realm: Optional[str] = None, service: Optional[str] = None) -> None:
+        for section in self.config.sections:
+            if self.is_database(section) and self.get_section_id(section) == db_name:
+                db_sec = self.config[section]
+                break
+        else:
+            raise EXAConfError(f'Database {db_name} does not exist.')
+
+        db_sec['Kerberos'] = {}
+        if host is not None:
+            db_sec['Kerberos']['Host'] = host
+        if realm is not None:
+            db_sec['Kerberos']['Realm'] = realm
+        if service is not None and service != '':
+            db_sec['Kerberos']['Service'] = service
+        db_sec['Kerberos']['Keytab'] = os.path.join(self.container_root, self.etc_dir, f'{db_name}-keytab')
+
+
+    def get_kerberos(self, db_name: str) -> Optional[dict]:
+        for section in self.config.sections:
+            if self.is_database(section) and self.get_section_id(section) == db_name:
+                db_sec = self.config[section]
+                break
+        else:
+            raise EXAConfError(f'Database {db_name} does not exist.')
+
+        return db_sec.get('Kerberos') # type: ignore[no-any-return]
