@@ -290,8 +290,8 @@ class EXAConf(object):
     node_uuid = "etc/node_uuid"
     valid_platforms = ('docker', 'vm', 'aws', 'azure', )
     valid_vol_types = ('data', 'archive', 'remote', 'object', )
-    valid_remote_vol_types = ('smb', 'ftp', 's3', 'file', )
-    valid_object_vol_types = ('s3', )
+    valid_remote_vol_types = ('smb', 'ftp', 'sftp', 'webhdfs', 'webdav', 'file', 's3', 'gs', 'azure')
+    valid_object_vol_types = ('s3',)
     remote_vol_id_offset = 10000
     docker_logs_filename = "docker_logs"
     docker_max_logs_copies = 9
@@ -372,8 +372,8 @@ class EXAConf(object):
         # or taken from the Docker image).
         # The 'version' parameter is static and denotes the version
         # of the EXAConf python module and EXAConf format
-        self.version = "7.1.23"
-        self.re_version = "7.1.23"
+        self.version = "7.1.24"
+        self.re_version = "7.1.24"
         self.set_os_version(self.version)
         self.set_db_version(self.version)
         self.set_re_version(self.re_version)
