@@ -5143,12 +5143,12 @@ class EXAConf(object):
     # }}}
     # {{{ To uid
 
-    def to_uid(self, uname):
+    def to_uid(self, uname: Union[str, int]) -> int:
         """
         Returns the user ID of the given username. If it's already an ID, it either returns it directly
         or converts it to an int if it's a string.
         """
-        uid = None
+        uid: Optional[int] = None
         # is it a string?
         if isinstance(uname, str):
             # does the string contain a UID?
@@ -5171,21 +5171,22 @@ class EXAConf(object):
     # }}}
     # {{{ To uname
 
-    def to_uname(self, uid):
+    def to_uname(self, uid: Union[str, int]) -> str:
         """
         Returns the username of the given user ID. ID can be an int or a string. If ID is already a username, returns it unmodified.
         """
-        uname = None
+        uname: Optional[str] = None
         # is it a string?
         if isinstance(uid, str):
             # does the string contain a UID?
             # YES -> convert to int and then to username
             try:
-                uid = int(uid)
+                uid_: int = int(uid)
                 users = self.get_users()
                 for u in users.items():
-                    if u[1].id == uid:
+                    if u[1].id == uid_:
                         uname = u[0]
+                        break
             # NO -> it's already a valid username, do nothing
             except ValueError:
                 uname = uid
@@ -5195,6 +5196,7 @@ class EXAConf(object):
             for u in users.items():
                 if u[1].id == uid:
                     uname = u[0]
+                    break
 
         if uname is None:
             raise EXAConfError("User with ID %i does not exist in EXAConf!" % int(uid))
@@ -5203,12 +5205,12 @@ class EXAConf(object):
     # }}}
     # {{{ To gid
 
-    def to_gid(self, gname):
+    def to_gid(self, gname: Union[str, int]) -> int:
         """
         Returns the group ID of the given groupname. If it's already an ID, it either returns it directly
         or converts it to an int if it's a string.
         """
-        gid = None
+        gid: Optional[int] = None
         # is it a string?
         if isinstance(gname, str):
             # does the string contain a GID?
@@ -5231,21 +5233,22 @@ class EXAConf(object):
     # }}}
     # {{{ To gname
 
-    def to_gname(self, gid):
+    def to_gname(self, gid: Union[str, int]) -> str:
         """
         Returns the name of the given group ID. ID can be an int or a string. If ID is already a groupname, returns it unmodified.
         """
-        gname = None
+        gname: Optional[str] = None
         # is it a string?
         if isinstance(gid, str):
             # does the string contain a GID?
             # YES -> convert to int and then to username
             try:
-                gid = int(gid)
+                gid_ = int(gid)
                 groups = self.get_groups()
                 for g in groups.items():
-                    if g[1].id == gid:
+                    if g[1].id == gid_:
                         gname = g[0]
+                        break
             # NO -> it's already a valid username, do nothing
             except ValueError:
                 gname = gid
@@ -5255,6 +5258,7 @@ class EXAConf(object):
             for g in groups.items():
                 if g[1].id == gid:
                     gname = g[0]
+                    break
 
         if gname is None:
             raise EXAConfError("Group with ID %i does not exist in EXAConf!" % int(gid))
