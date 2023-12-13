@@ -10,11 +10,16 @@ Your use of this repository is subject to the [Exasol Terms & Conditions](https:
 ###### Please note that this is an open source project which is *not officially supported* by Exasol. We will try to help you as much as possible, but can't guarantee anything since this is not an official Exasol product.
 
 Currently supported features:
+
 - create / start / stop a database in a virtual cluster
 - use the UDF framework
 - expose ports from containers on the local host
 - update the virtual cluster
 - create backups on archive volumes
+
+Limitations:
+
+- docker-db does not include the graphical web interface called "[ExaOperation](https://docs.exasol.com/administration/on-premise/admin_interface/exaoperation.htm)"
 
 # Table of contents
 [Requirements](#requirements)
