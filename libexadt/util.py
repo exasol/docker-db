@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional, List, Tuple, Union, Dict
 from types import ModuleType
 from datetime import datetime, timezone
 from xmlrpc.client import Server as XMLRPCServer, SafeTransport
+from pathlib import Path
 
 # pwd is only available on UNIX systems
 try:
@@ -611,3 +612,13 @@ def utc_date_ms() -> str: # {{{
     """
     return str(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f +00:00'))
 # }}}
+
+__portable_filename_re = re.compile(r'^(\w|\.|-)+$', flags=re.ASCII)
+def is_file_name_safe(name: str) -> bool:
+    '''
+    A filename is safe if it contains no path separators
+    and does not have special meaning (i.e. dot and dot-dot).
+    https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_282
+    https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_170
+    '''
+    return bool(__portable_filename_re.fullmatch(name)) and (name not in ['.','..'])

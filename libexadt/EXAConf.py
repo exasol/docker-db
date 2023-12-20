@@ -12,14 +12,14 @@ from pathlib import PurePath
 from typing import Any, Dict, Pattern, Tuple, Type, TypeVar, Union, Optional, TYPE_CHECKING, List
 # mypy has problems with try imports: https://github.com/python/mypy/issues/1153
 if TYPE_CHECKING:
-    from libconfd.common.util import atomic_file_writer, units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid
-    units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid #silence pyflakes
+    from libconfd.common.util import atomic_file_writer, units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid, is_file_name_safe
+    units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid, is_file_name_safe #silence pyflakes
 else:
     try:
-        from libconfd.common.util import atomic_file_writer, units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid
-        units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid #silence pyflakes
+        from libconfd.common.util import atomic_file_writer, units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid, is_file_name_safe
+        units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, encode_remote_vol_passwd, decode_remote_vol_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid, is_file_name_safe #silence pyflakes
     except ImportError:
-        from libexadt.util import atomic_file_writer, units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid
+        from libexadt.util import atomic_file_writer, units2bytes, bytes2units, gen_bfs_passwd, encode_bfs_passwd, get_euid, get_egid, gen_node_uuid, encode_shadow_passwd, is_shadow_encoded, str2sec, sec2str, gen_b64_uuid, b64_to_uuid, is_valid_b64_uuid, is_file_name_safe
 
 import exacos_constants
 
@@ -2826,6 +2826,8 @@ class EXAConf(object):
         """
         if self.bucketfs_exists(bucketfs_name):
             raise EXAConfError("BucketFS '%s' can't be added because that name is already in use!" % bucketfs_name)
+        if not is_file_name_safe(bucketfs_name):
+            raise EXAConfError(f"BucketFS '{bucketfs_name}' can't be added because its name is not safe!")
         # check if given owner exists
         if not self.uid_exists(owner[0]):
             raise EXAConfError("Can't add BucketFS '%s' because owner with UID %i doesn't exist!\n" % (bucketfs_name, owner[0]))
@@ -2920,6 +2922,8 @@ class EXAConf(object):
             raise EXAConfError("Bucket '%s' can't be added because BucketFS '%s' does not exist!" % (bucket_name, bucketfs_name))
         if self.bucket_exists(bucket_name, bucketfs_name):
             raise EXAConfError("Bucket '%s' already exists in BucketFS '%s'!" % (bucket_name, bucketfs_name))
+        if not is_file_name_safe(bucket_name):
+            raise EXAConfError(f"Bucket '{bucket_name}' can't be added because its name is not path-safe!")
         bfs_sec = self.config["BucketFS : %s" % bucketfs_name]
         bfs_sec["Bucket : %s" % bucket_name] = {}
         b_sec = bfs_sec["Bucket : %s" % bucket_name]
@@ -3366,8 +3370,13 @@ class EXAConf(object):
     # }}}
     # {{{ Merge EXAConf
 
-    def merge_exaconfs(self, exaconf_list, allow_self=False, force=False,
-                       keep_license=True) -> None:
+    def merge_exaconfs(
+        self,
+        exaconf_list: List['EXAConf'],
+        allow_self: bool = False,
+        force: bool = False,
+        keep_license: bool = True,
+    ) -> None:
         """
         Merges the changes in the given list of EXAConf instances into this one.
         Done by selecting the EXAConf with the highest revision nr., copying
