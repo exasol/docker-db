@@ -349,7 +349,6 @@ class EXAConf(object):
     def_storage_connection_threads = 16
     def_storage_max_connections = 1024
     def_storage_proxy_url = None
-    def_webterm_subdir = "share/webterm/"
     def_device_type = "block"
     def_c4socket = "/var/run/c4_socket"
     def_timezone = "Europe/Berlin"
@@ -5031,15 +5030,6 @@ class EXAConf(object):
         cf = os.path.join(self.container_root, self.conf_remote_volumes_dir,
                           self.to_uname(user) + "." + str(self.to_uid(user)) + ".conf")
         return cf
-
-    # }}}
-    # {{{ Get gui dir
-
-    def get_webterm_dir(self) -> str:
-        """
-        Returns the full path to the directory containing the GUI files (aka. the "GUI web root").
-        """
-        return os.path.join(self.get_os_dir(), self.def_webterm_subdir)
 
     # }}}
     # {{{ Get object storage connection timeout

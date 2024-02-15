@@ -247,7 +247,7 @@ class docker_handler(object):
             raise DockerError("Failed to query information about image '%s': %s" % (image_name, e))
         # add labels
         image_conf['labels'] =  config()
-        for item in image['ContainerConfig']['Labels'].items():
+        for item in image['Config']['Labels'].items():
             image_conf['labels'][item[0]] = item[1]
         return image_conf
 #}}}

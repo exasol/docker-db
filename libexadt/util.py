@@ -622,3 +622,20 @@ def is_file_name_safe(name: str) -> bool:
     https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_170
     '''
     return bool(__portable_filename_re.fullmatch(name)) and (name not in ['.','..'])
+
+def get_linux_distribution() -> Tuple[str, str]:
+    """
+    Return the linux distribution as a tuple (ID, version).
+    """
+    try:
+        with open('/etc/os-release', 'r') as file:
+            for line in file:
+                if line.strip().startswith('ID='):
+                    # the entries can be in quotes or not
+                    dist_id = line.strip().split('=')[1].lower().strip('\"\' ')
+                elif line.strip().startswith('VERSION_ID='):
+                    # the entries can be in quotes or not
+                    dist_release = line.strip().split('=')[1].lower().strip('\"\' ')
+        return (dist_id, dist_release)
+    except Exception:
+        raise RuntimeError("Failed to determine linux distribution.")
