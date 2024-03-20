@@ -3,7 +3,7 @@
 Exasol is a high-performance, in-memory, MPP database specifically designed for analytics. 
 This repository contains a dockerized version of the Exasol DB for testing purposes.
 
-The dockerized version of Exasol in this repository can be used with up to 10GiB of data. If you need more please get in contact with us via https://exasol.com/get-in-touch.
+**Note**: The dockerized version of Exasol in this repository can be used with up to 10GiB of data as single-node setup. If you need more data or need a multi-node setup please get in contact with us via https://exasol.com/get-in-touch.
 
 Your use of this repository is subject to the [Exasol Terms & Conditions](https://www.exasol.com/terms-and-conditions)
 
