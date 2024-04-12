@@ -33,8 +33,6 @@ Currently supported features:
 
 [Managing disks and devices](#managing-disks-and-devices)
 
-[Using the Exasol Docker tool (`exadt`)](#using-the-exasol-docker-tool)
-
 [Installing custom JDBC drivers](#installing-custom-jdbc-drivers)
 
 [Installing Oracle drivers](#installing-oracle-drivers)
@@ -50,7 +48,7 @@ Currently supported features:
  
 ## Docker
 
-The Exasol Docker image and `exadt` CLI tool have been developed and tested with Docker 18.03.1-ce (API 1.37) and Python module `docker` (formerly known as `docker-py`) 3.2.1 on Fedora 27. It may also work with earlier versions, but that is not guaranteed.
+The Exasol Docker image has been developed and tested with Docker 18.03.1-ce (API 1.37) and Python module `docker` (formerly known as `docker-py`) 3.2.1 on Fedora 27. It may also work with earlier versions, but that is not guaranteed.
  
 Please see [the Docker installation documentation](https://docs.docker.com/installation/) for details on how to upgrade your Docker daemon.
  
@@ -71,10 +69,7 @@ Each database instance needs at least **2 GiB RAM**. We recommend that the host 
 
 ### Services
 
-Make sure that **NTP** is configured correctly on the host. Also, the **RNG** daemon must be running in order to provide enough entropy for the Exasol services in the container.
-
-### Packages
-If you like to use our `exadt` tool, you'll need to install `git` and `pipenv`. `pipenv` is used to create virtual environments for Python projects (see [https://docs.pipenv.org/](https://docs.pipenv.org/)). Using `pipenv` makes it easy to install the required versions of all `exadt` dependencies without affecting your host environment. You can install `pipenv` using `pip` or your favorite package management system.                 
+Make sure that **NTP** is configured correctly on the host. Also, the **RNG** daemon must be running in order to provide enough entropy for the Exasol services in the container.       
 
 # Recommendations
  
@@ -346,223 +341,6 @@ $ truncate --size=+10GB /exa/data/storage/dev.1
 $ cshdd --enlarge --node-id 11 -h /exa/data/storage/dev.1[.data]
 
 ### 4. Repeat these steps for all devices and containers
- 
-
-# Using the Exasol Docker Tool
-
-The `exadt` command-line tool is used to create, initialize, start, stop, update and delete a Docker based Exasol cluster.
-
-**NOTE: exadt currently only supports single-host-clusters. See [Creating a multi-host Exasol cluster](#creating-a-multi-host-exasol-cluster) for how to create a multi-host-cluster (with one container per host).**
- 
-## 0. Preliminaries
-
-The installation steps below assume that you have `pipenv` installed on your Docker host system.
-
-**NOTE: there are multiple major versions of Exasol in the Github and Docker repositories, therefore it's better to use the desired version nr. instead of the `latest` tag with all `git` and `docker` commands.** 
-
-- Pull the image to your Docker host:
-  ```console
-  $ docker pull exasol/docker-db:<version>
-  ```
-- Install `exadt`:
-  ```console
-  $ git clone https://github.com/Exasol/docker-db.git <version>
-  $ cd docker-db
-  ```
-- Install the `exadt` dependencies:
-  ```console
-  $ pipenv install -r exadt_requirements.txt
-  ```
-- Activate the `pipenv` environment
-  ```console
-  $ pipenv shell
-  ```
-- Create and configure your virtual Exasol cluster by using the commands described in the `exadt` documentation below.
-
-**IMPORTANT** : all `exadt` commands listed below have to be executed within the shell spawned by the `pipenv shell` command! Alternatively, you can use `pipenv run ./exadt`.
- 
-## 1. Creating a cluster
-
-Select a root directory for your EXASOl cluster. It will be used to store the data, metadata and buckets of all local containers and should therefore be located on a filesystem with sufficient free space (min. 10 GiB are recommended).
-
-**NOTE: this example creates only one node. You can easily create mutliple (virtual) nodes by using the --num-nodes option.**
-
-```console
-$ ./exadt create-cluster --root ~/MyCluster/ --create-root MyCluster
-Successfully created cluster 'MyCluster' with root directory '/home/user/MyCluster/'.
-```
-
-`exadt` stores information about all clusters within `$HOME/.exadt.conf` and `/etc/exadt.conf` (if the current user has write permission in `/etc`). Both files are searched when executing a command that needs the cluster name as an argument. 
-
-In order to list all existing clusters you can use `exadt list-clusters`:
-
-```console
-$ ./exadt list-clusters
- CLUSTER                     ROOT                                       IMAGE                    
- MyCluster                   /home/user/MyCluster                       <uninitialized>
-```
-
-## 2. Initializing a cluster
-
-After creating a cluster it has to be initialized. Mandatory parameters are:
-
-- the Exasol Docker image 
-- the license file
-- the type of EXAStorage devices (currently only 'file' is supported)
-
-```console
-$ ./exadt init-cluster --image exasol/docker-db:<version> --license ./license/license.xml --auto-storage MyCluster
-Successfully initialized configuration in '/home/user/MyCluster/EXAConf'.
-Successfully initialized root directory '/home/user/MyCluster/'.
-```
-
-This command creates subdirectories for each virtual node in the root directory. These are mounted as Docker volumes within each container (at '/exa') and contain all data, metadata and buckets.
-
-It also creates the file `EXAConf` in the root directory, which contains the configuration for the whole cluster and currently has to be edited manually if a non-default setup is used.
-
-### Automatically creating and assigning file devices
-
-The example above uses the `--auto-storage` option which tells `exadt` to automatically create file-devices for all virtual nodes (within the root directory). These devices are assigned to the EXAStorage volumes, that are also automatically created. The devices need at least 10GiB of free space and use up to 100GiB of it (all devices combined). 
-
-If `--auto-storage` is used, you can skip the next step entirely (and *continue with section 4*).
-
-## 3. Adding EXAStorage devices
-
-**NOTE:  This step can be skipped if `--auto-storage` has been used during initialization.**
-
-Next, devices for EXAStorage need to be added. This can be done by executing:
-
-```console
-$ ./exadt create-file-devices --size 80GiB MyCluster
-Successfully created the following file devices:
-Node 11 : ['/home/user/MyCluster/n11/data/storage/dev.1']
-```
-
-As you can see, the file devices are created within the `data/storage` subdirectory of each node's Docker root. They are created as *sparse files*, i. e. their size is stated as the given size but they actually have size 0 and grow as new data is being written.
-
-All devices must be assigned to a 'disk'. A disk is a group of devices that can be assigned to an EXAStorage volume. The disk name can be specified with the `--disk` parameter. If omitted, the newly created devices will be assigned to the disk named 'disk1'.
-
-### Assigning devices to volumes
-
-After creating the devices, they have to be assigned to the corresponding volumes. If you did not use `--auto-storage` (see above), you have to edit `EXAConf` manually. Open it and locate the following section:
-
-```
-[EXAVolume : DataVolume1]
-    Type = data
-    Nodes = 11
-    Disk =
-    Size =
-    Redundancy = 1
-```
-
-Now add the name of the disk ('disk1', if you did not specify a name when executing `create-file-devices`) and the volume size, e. g:
-
-```
-    Disk = disk1
-    Size = 100GiB
-```
-
-Then do the same for the section `[EXAVolume : ArchiveVolume1]`.
-
-Make sure not to make the volume too big! The specified size is the size that is available for the database, i. e. if the redundancy is 2, the volume will actually use twice the amount of space! Also make sure to leave some free space for the temporary volume, that is created by the database during startup.
-
-## 4. Starting a cluster
-
-The cluster is started using the `exadt start-cluster` command. Before the containers are actually created, `exadt` checks if there is enough free space for the sparse files (if they grow to their max. size). If not, the startup will fail:
-
-```console
-$ ./exadt start-cluster MyCluster
-Free space on '/' is only 22.2 GiB, but accumulated size of (sparse) file-devices is 80.0 GiB!
-'ERROR::DockerHandler: Check for space usage failed! Aborting startup.'
-```
-
-If that's the case, you can replace the existing devices with smaller ones and (optionally) place them on an external partition:
-
-```console
-$ ./exadt create-file-devices --size 10GiB MyCluster --replace --path /mnt/data/
-Do you really want to replace all file-devices of cluster 'MyCluster'? (y/n): y
-The following file devices have been removed:
-Node 11 : ['/home/user/MyCluster/n11/data/storage/dev.1']
-Successfully created the following file devices:
-Node 11 : ['/mnt/data/n11/dev.1']
-```
-
-The devices that are located outside of the root directory are mapped into the file system of the container (within `/exa/data/storage/`). They are often referenced as 'mapped devices'.
-
-Now the cluster can be started:
-
-```console
-$ ./exadt start-cluster MyCluster
-Copying EXAConf to all node volumes.
-Creating private network 10.10.10.0/24 ('MyCluster_priv')... successful
-No public network specified.
-Creating container 'MyCluster_11'... successful
-Starting container 'MyCluster_11'... successful
-```
-
-This command creates and starts all containers and networks. Each cluster uses one or two networks to connect the containers. These networks are not connected to other clusters. 
-
-The containers are (re)created each time the cluster is started and they are destroyed when it is deleted! All persistent data is stored within the root directory (and the mapped devices, if any).
-
-## 5. Inspecting a cluster
-
-All containers of an existing cluster can be listed by executing:
-
-```console
-$ ./exadt ps MyCluster
- NODE ID      STATUS          IMAGE                       NAME   CONTAINER ID   CONTAINER NAME    EXPOSED PORTS       
- 11           Up 5 seconds    exasol/docker-db:7.0.0   n11    e9347c3e41ca   MyCluster_11      9563->8563,2581->2580
-```
-
-The `EXPOSED PORTS` column shows all container ports that are reachable from outside the local host ('host'->'container'), usually one for the database and one for BucketFS.
-
-## 6. Stopping a cluster
-
-A cluster can be stopped by executing:
-
-```console
-$ ./exadt stop-cluster MyCluster
-Stopping container 'MyCluster_11'... successful
-Removing container 'MyCluster_11'... successful
-Removing network 'MyCluster_priv'... successful
-```
-
-As stated above, the containers are deleted when a cluster is stopped, but the root directory is preserved (as well as all mapped devices). Also the automatically created networks are removed. 
- 
-## 7. Updating a cluster
-
-A cluster can be updated by exchanging the Exasol Docker image (but it has to be stopped first):
-
-```console
-$ git pull <version>
-$ docker pull exasol/docker-db:<version>
-$ pipenv install -r exadt_requirements.txt
-$ ./exadt update-cluster --image exasol/docker-db:<version> MyCluster
-Cluster 'MyCluster' has been successfully updated!
-- Image :  exasol/docker-db:7.0.0 --> exasol/docker-db:7.0.1
-- DB    :  7.0.0                     --> 7.0.1
-- OS    :  7.0.0                     --> 7.0.1
-Restart the cluster in order to apply the changes.
-```
-
-The cluster has to be restarted in order to recreate the containers from the new image (and trigger the internal update mechanism).
- 
-## 8. Deleting a cluster
-
-A cluster can be completely deleted by executing:
-
-```console
-$ ./exadt delete-cluster MyCluster
-Do you really want to delete cluster 'MyCluster' (and all file-devices)?  (y/n): y
-Deleting directory '/mnt/data/n11'.
-Deleting directory '/mnt/data/n11'.
-Deleting root directory '/home/user/MyCluster/'.
-Successfully removed cluster 'MyCluster'.
-```
-
-Note that all file devices (even the mapped ones) and the root directory are deleted. You can use `--keep-root` and `--keep-mapped-devices` in order to prevent this.
-
-A cluster has to be stopped before it can be deleted (even if all containers are down)!
 
 # Installing custom JDBC drivers
 
