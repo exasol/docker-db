@@ -48,7 +48,7 @@ Currently supported features:
  
 ## Docker
 
-The Exasol Docker image has been developed and tested with Docker 18.03.1-ce (API 1.37) and Python module `docker` (formerly known as `docker-py`) 3.2.1 on Fedora 27. It may also work with earlier versions, but that is not guaranteed.
+The Exasol Docker image has been developed and tested with Docker 18.03.1-ce (API 1.37) on Fedora 27. It may also work with earlier versions, but that is not guaranteed.
  
 Please see [the Docker installation documentation](https://docs.docker.com/installation/) for details on how to upgrade your Docker daemon.
  
