@@ -1,6 +1,6 @@
 ⚠️ Since 2024-04-14 this repository only contains __documentation__ for the Exasol Docker image.
 
-⚠️ For the binaries, please refer to [exaso/docker-db on DockerHub](https://hub.docker.com/r/exasol/docker-db)
+⚠️ For the binaries, please refer to [exasol/docker-db on DockerHub](https://hub.docker.com/r/exasol/docker-db)
 
 ℹ️ GitHub issues are disabled on this repository on purpose. Exasol Docker DB is a project mainly intended for automatic testing of Exasol deployments.
 
