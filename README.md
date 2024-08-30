@@ -56,6 +56,10 @@ Please see [the Docker installation documentation](https://docs.docker.com/insta
 
 Docker privileged mode is required for permissions management, UDF support and environment configuration and validation (sysctl, hugepages, block-devices, etc.).
 
+## CPU Architecture
+
+Exasol currently only support *x86-64* CPUs (Intel64 or AMD64) and is for this architecture optimized.
+
 ## Host OS
 
 We currently only support Docker on Linux. If you are using a Windows host you'd have to create a Linux VM.
