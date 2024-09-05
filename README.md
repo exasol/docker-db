@@ -58,7 +58,7 @@ Docker privileged mode is required for permissions management, UDF support and e
 
 ## CPU Architecture
 
-Exasol currently only supports 64-bit *x86-64* platforms with SSSE3 featured CPUs (Intel64 or AMD64) and is for this architecture optimized. (comparable to Intel Xeon Woodcrest and upwards). See also the [System Requirements](https://docs.exasol.com/db/7.1/administration/on-premise/installation/system_requirements.htm).
+Exasol currently only supports 64-bit *x86-64* platforms with SSSE3 featured CPUs (Intel64 or AMD64) and is for this architecture optimized. See also the [System Requirements](https://docs.exasol.com/db/7.1/administration/on-premise/installation/system_requirements.htm).
 
 ## Host OS
 
