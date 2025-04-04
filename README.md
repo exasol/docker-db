@@ -1,8 +1,17 @@
-⚠️ Since 2024-04-14 this repository only contains __documentation__ for the Exasol Docker image.
+> [!WARNING]
+> Please note that this is an open source project which is __not officially supported__ by Exasol.
+> We will try to help you as much as possible, but can't guarantee anything since this is not an official Exasol product.
 
-⚠️ For the binaries, please refer to [exasol/docker-db on DockerHub](https://hub.docker.com/r/exasol/docker-db)
+> [!IMPORTANT]
+> Please note that the underlying base image for the Exasol 7.1 Docker image is CentOS 7, which has reached its end-of-life (EOL).
+> Consequently, official support for CentOS 7 is no longer available. __Please use Exasol 8__.
 
-ℹ️ GitHub issues are disabled on this repository on purpose. Exasol Docker DB is a project mainly intended for automatic testing of Exasol deployments.
+> [!NOTE]
+> Since 2024-04-14 this repository only contains __documentation__ for the Exasol Docker image.
+> For the binaries, please refer to [exasol/docker-db on DockerHub](https://hub.docker.com/r/exasol/docker-db)
+
+> [!NOTE]
+> GitHub issues are disabled on this repository on purpose. Exasol Docker DB is a project mainly intended for automatic testing of Exasol deployments.
 
 # Exasol Docker version
 
@@ -40,8 +49,6 @@ Currently supported features:
 [Connecting to the database](#connecting-to-the-database)
 
 [Troubleshooting](#troubleshooting)
-
-[Reporting bugs](#reporting-bugs)
 
 
 # Requirements
@@ -466,8 +473,3 @@ We strongly recommend to always use O_DIRECT, but if you really can't, then you 
 > Could not start database: system does not have enough active nodes or DWAd was not able to create startup parameters for system
 
 If all containers started successfully but the database did not and you see a message similar to this in the output of `docker logs`, you may not have enough memory in your host(s). The DB needs at least 2 GiB RAM per node (that's also the default value in EXAConf).
-
-
-# Reporting bugs
-
-Please read the [Contribution guidelines for this project](CONTRIBUTING.md) before submitting a bug report or pull request!
