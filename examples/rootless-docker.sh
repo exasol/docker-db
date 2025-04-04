@@ -7,15 +7,25 @@ disk_size="100G"
 external_port=8563
 container_name="exasol-db-rootless"
 external_volume=""
-CONTENG=podman
-
+cont_eng=podman
+cont_opts=(
+    --sysctl kernel.msgmax=1073741824
+    --sysctl kernel.msgmnb=1073741824
+    --sysctl kernel.shmmni=32768
+    --cap-add=SYS_ADMIN
+    --cap-add=SYS_PTRACE
+    --security-opt seccomp=unconfined
+    --security-opt label=disable
+    --security-opt apparmor=unconfined
+    --security-opt unmask=ALL
+)
 
 # Help function
 usage() {
     echo "Usage: $0 [options]"
     echo "Options:"
     echo "  --db-version <version>      Set the Exasol DB version (default: latest)"
-    echo "  --network <name>           Set the $CONTENG network name (default: exasol-network)"
+    echo "  --network <name>           Set the $cont_eng network name (default: exasol-network)"
     echo "  --disk-size <size>         Set the disk size (default: 100G)"
     echo "  --external-port <port>     Set the external port mapping to container port 8563 (default: 8563)"
     echo "  --container-name <name>    Set the container name (default: exasol-container)"
@@ -56,8 +66,8 @@ volume_size_num=$(echo "$disk_size_num * 0.9" | bc | awk '{printf "%.0f", $1}')
 volume_size="${volume_size_num}G"
 
 # Create network if not exists
-$CONTENG network inspect "$network_name" >/dev/null 2>&1 || \
-    $CONTENG network create "$network_name"
+$cont_eng network inspect "$network_name" >/dev/null 2>&1 || \
+    $cont_eng network create "$network_name"
 
 # Prepare volume mapping if external volume is provided
 volume_mapping=""
@@ -66,17 +76,10 @@ if [[ -n "$external_volume" ]]; then
 fi
 
 # Run container initialization  
-$CONTENG run -d \
+$cont_eng run -d "${cont_opts[@]}" \
     --name "$container_name" \
     --entrypoint bash \
     --network="$network_name" \
-    --sysctl kernel.msgmax=1073741824 \
-    --sysctl kernel.msgmnb=1073741824 \
-    --sysctl kernel.shmmni=32768 \
-    --cap-add=SYS_ADMIN --cap-add=SYS_PTRACE \
-    --security-opt seccomp=unconfined \
-    --security-opt label=disable \
-    --security-opt apparmor=unconfined \
     -p 8563:${external_port} \
     $volume_mapping \
     exasol/docker-db:$db_version \
@@ -102,7 +105,7 @@ $CONTENG run -d \
         exaconf modify-node -n 11 -p $ip_address
         /exa/init.sh
     ' &&  \
-    echo "Setup completed. Container '$container_name' started using $CONTENG ... " && \
-    $CONTENG ps --all
+    echo "Setup completed. Container '$container_name' started using $cont_eng ... " && \
+    $cont_eng ps --all
 
 
