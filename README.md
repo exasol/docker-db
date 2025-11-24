@@ -89,7 +89,7 @@ Make sure that **NTP** is configured correctly on the host. Also, the **RNG** da
 
 We strongly recommend setting the CPU governor on the host to `performance`, to avoid serious performance problems. There are various tools to do that, depending on your distribution. Usually, the following command works:
 
-```sh
+```shell
 for F in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance >$F; done
 ```
 
@@ -104,7 +104,7 @@ When setting it to `host` the number of hugepages from the host system will be u
 ## Resource limitation
 
 It's possible to limit the resources of your Exasol container with the following `docker run` options: 
-```sh
+```shell
 docker run --cpuset-cpus="1,2,3,4" --memory=20g --memory-swap=20g --memory-reservation=10g exasol/docker-db:<version>
 ```
 This is especially recommended if you have multiple Exasol containers (or other services) on the same host. In that case, you should evenly distribute the available CPUs and memory throughout your Exasol containers.
@@ -115,7 +115,7 @@ See [https://docs.docker.com/config/containers/resource_constraints/](https://do
 
 You can create an Exasol container from the Exasol docker image using the following command:
 
-```sh
+```shell
 docker run --name exasoldb -p 127.0.0.1:9563:8563 --detach --privileged --stop-timeout 120  exasol/docker-db:<version>
 ```
 
@@ -125,7 +125,7 @@ In this example port 8563 (within the container) is exposed on the local port 95
 
 All data, configuration and logfiles of an Exasol container are stored below `/exa`. With the command above, this data is lost when the container is removed. However, you can make it persistent by mounting a volume into the container at `/exa`, for example:
 
-```sh
+```shell
 docker run --name exasoldb  -p 127.0.0.1:9563:8563 --detach --privileged --stop-timeout 120 -v exa_volume:/exa exasol/docker-db:<version>
 ```
 
@@ -135,13 +135,13 @@ See [the Docker volumes documentation](https://docs.docker.com/engine/tutorials/
 
 It is important to make sure that the database has been shut down correctly before stopping a container. A high stop-timeout (see example above) increases the chance that the DB can be shut down gracefully before the container is stopped, but it's not guaranteed. It's better to stop the DB manually by executing the following command within the container (after attaching to it):
 
-```sh
+```shell
 dwad_client stop-wait DB1
 ```
 
 Or from outside the container:
 
-```sh
+```shell
 docker exec -ti exasoldb dwad_client stop-wait DB1
 ```
 
@@ -149,7 +149,7 @@ docker exec -ti exasoldb dwad_client stop-wait DB1
 
 An existing persistent volume can be updated (for use with a later version of an Exasol image) by calling the following command with the *new* image:
 
-```sh
+```shell
 docker run --rm -v exa_volume:/exa exasol/docker-db:<new version> update-sc
 ```
 
@@ -178,7 +178,7 @@ First, you have to create the configuration for the cluster. There are two possi
 
 Execute the following command (`--num-nodes` is the number of containers in the cluster):
 
-```sh
+```shell
 export CONTAINER_EXA="$HOME/container_exa/"
 docker run -v "$CONTAINER_EXA":/exa --rm -i exasol/docker-db:<version> init-sc --template --num-nodes 3
 ```
@@ -192,7 +192,7 @@ After the command has finished, the directory `$CONTAINER_EXA` contains all subd
 
 You can create a template file and redirect it to wherever you want by executing: 
 
-```sh
+```shell
 docker run --rm -i exasol/docker-db:<version> -q init-sc --template --num-nodes 3 -p > ~/MyExaConf
 ```
 
@@ -239,7 +239,7 @@ For more information on device management, see [Managing disks and devices](#man
     Size =  # <-- enter volume size here
 ```
 You can also change the volume size using the `exaconf` CLI tool from the Exasol image:
-```sh
+```shell
 docker run --rm -v ""$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf modify-volume -n DataVolume1 -s 1TiB
 ```
   
@@ -271,7 +271,7 @@ Copy `$CONTAINER_EXA` to all cluster nodes (the exact path is not relevant, but 
 
 You can create device files by executing (**on each node**):
 
-```sh
+```shell
 truncate -s 1G "$CONTAINER_EXA/data/storage/dev.1"
 ```
 
@@ -287,7 +287,7 @@ For more information on device management, see [Managing disks and devices](#man
 
 The cluster is started by creating all containers individually and passing each of them its ID from the EXAConf. For `n11` the command would be:
 
-```sh
+```shell
 docker run --detach --network=host --privileged -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" init-sc --node-id 11
 ```
 
@@ -303,13 +303,13 @@ All EXAStorage devices have to be located below `/exa/data/storage/` (within the
 
 You can create file devices by executing (**on each node**):
 
-```sh
+```shell
 truncate -s 1G "$CONTAINER_EXA/data/storage/dev.2"
 ```
 
 or (alternatively):
 
-```sh
+```shell
 dd if=/dev/zero of="$CONTAINER_EXA/data/storage/dev.2" bs=1M count=1 seek=999
 ```
 
@@ -319,7 +319,7 @@ This will create a sparse file of 1GB (1000 blocks of 1 MB) that holds the data.
 >
 > You can also create the files in any place you like and mount them to `/exa/data/storage/` with
 > 
-> ```sh
+> ```shell
 > docker run -v /path/to/dev.x:/exa/data/storage/dev.x`.
 > ```
 
@@ -339,7 +339,7 @@ After the devices have been created, they need to be added to EXAConf. You can e
 
 or use the `exaconf` CLI tool from the Exasol image:
 
-```sh
+```shell
 docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf add-node-device -D disk1 -d dev.2 -n 11
 ```
 
@@ -359,7 +359,7 @@ Similar to adding devices, you can either manually edit EXAConf …
 
 … or use the `exaconf` CLI tool from the Exasol image:
 
-```sh
+```shell
 docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-dev-7.0.0:juk" exaconf add-node-disk -D disk2 -n 11
 docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf add-node-device -D disk2 -d dev.3 -n 11
 docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf add-node-device -D disk2 -d dev.4 -n 11
@@ -375,19 +375,19 @@ If you need to enlarge a file device of an existing Exasol container, you can us
 
 ### 1. Open a terminal in the container:
 
-```sh
+```shell
 docker exec -ti <containername> /bin/bash
 ```
 
 ### 2. Physically enlarge the file (e.g., by 10GB):
 
-```sh
+```shell
 truncate --size=+10GB /exa/data/storage/dev.1
 ```
 
 ### 3. Logically enlarge the device (i.e., tell EXAStorage about the new size):
 
-```sh
+```shell
 cshdd --enlarge --node-id 11 -h /exa/data/storage/dev.1[.data]
 ```
 
@@ -449,7 +449,7 @@ In order for the database to find the driver, you have to upload it to `drivers/
 
 You can use `curl` for uploading, e.g.:
 
-```sh
+```shell
 curl -v -X PUT -T instantclient-basic-linux.x64-12.1.0.2.0.zip http://w:PASSWORD@10.10.10.11:2580/default/drivers/oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip
 ```
 
@@ -472,7 +472,7 @@ The default port of the BucketFS inside the docker container is `2580`. You must
 Read and write passwords for the BucketFS are autogenerated.
 You can find them in the EXAConf. They are base64-encoded and can be decoded like this:
 
-```sh
+```shell
 awk '/WritePasswd/{ print $3; }' EXAConf | base64 -d
 ```
 

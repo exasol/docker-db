@@ -34,21 +34,21 @@ In a running Exasol cluster, you can replace a *data node*, if you configure the
 
 Doing that for many data nodes will cause a cluster reorganization that will get expensive.
 
-You cannot, however, replace the running the management node.
-
 That is currently a theoretical possibility, though, since the license is for single nodes only.
+
+You cannot, however, replace the running the management node.
 
 ## Could I Resize a Data Node?
 
-Theoretically, yes. 
+Theoretically, yes. But it is not recommended.
 
-Downsizing any data node will define the maximum RAM size of a cluster and thus create a bottleneck.
+Downsizing any data node will define the maximum RAM size of all the data nodes in the cluster and thus create a bottleneck.
 
 ## How do I Upgrade the Version of a docker-db Container?
 
 We recommend that you replace the container with a new one.
 
-If you have data inside the container that you want to keep, you export it to a file and then import it into a new container.
+If you have data inside the container that you want to keep, please export it to a file and then import it into a new container.
 
 See also:
 
@@ -63,15 +63,20 @@ We made docker-db to be used in functional testing, and that must work with loca
 
 ## How do I Determine Service Health From Outside the Exasol Database?
 
-1. You can check the health of the database process by running `SELECT 1;` on the database port (default 8563).
+1. You can check the health of the database process by running a simple SQL query on the database port (default 8563).
+    ```sql
+    SELECT 1;
+    ```
 2. The BucketFS service can be checked by listing the buckets on the default port (2581).
-    `curl -v https://localhost:2581/`
+    ```shell
+    curl -v https://localhost:2581/
+    ```
 3. You can check whether UDFs are available by running a simple UDF script. 
    ```sql
     CREATE OR REPLACE PYTHON3 SCALAR SCRIPT return_one() RETURNS INTEGER AS
     def run(ctx):
-    return 1
+        return 1
     /
    ```
-
-
+   
+Please note that if you want to check from outside the docker network, you need port forwarding.
