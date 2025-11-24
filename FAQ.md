@@ -1,0 +1,77 @@
+# Frequently Asked Questions
+
+## Can I use docker-db in Production?
+
+No.
+
+Currently, docker-db is only approved for functional testing.
+
+## Does docker-db Come With a License?
+
+Yes.
+
+Docker-db has a license pre-installed that comes with restrictions. The restrictions are chosen to accommodate the needs of functional testing.
+
+## Are There Hard CPU Limits?
+
+Docker-db does not enforce any CPU limits.
+
+## Are There Hard RAM Limits?
+
+Docker-db does not enforce any RAM limits.
+
+## Are There Hard Storage Limits?
+
+The docker-db image license enforces a 10 GiB raw data storage limit.
+
+## Can I use docker-db in a Cluster?
+
+The license limits docker-db to a single node.
+
+## If I had a Cluster License, Could I Replace Running Nodes?
+
+In a running Exasol cluster, you can replace a *data node*, if you configure the cluster with reserve nodes.
+
+Doing that for many data nodes will cause a cluster reorganization that will get expensive.
+
+You cannot, however, replace the running the management node.
+
+That is currently a theoretical possibility, though, since the license is for single nodes only.
+
+## Could I Resize a Data Node?
+
+Theoretically, yes. 
+
+Downsizing any data node will define the maximum RAM size of a cluster and thus create a bottleneck.
+
+## How do I Upgrade the Version of a docker-db Container?
+
+We recommend that you replace the container with a new one.
+
+If you have data inside the container that you want to keep, you export it to a file and then import it into a new container.
+
+See also:
+
+* [EXPORT](https://docs.exasol.com/db/latest/sql/export.htm)
+* [IMPORT](https://docs.exasol.com/db/latest/sql/import.htm)
+
+## Does docker-db Support Object Storage (Like S3)?
+
+No.
+
+We made docker-db to be used in functional testing, and that must work with local storage.
+
+## How do I Determine Service Health From Outside the Exasol Database?
+
+1. You can check the health of the database process by running `SELECT 1;` on the database port (default 8563).
+2. The BucketFS service can be checked by listing the buckets on the default port (2581).
+    `curl -v https://localhost:2581/`
+3. You can check whether UDFs are available by running a simple UDF script. 
+   ```sql
+    CREATE OR REPLACE PYTHON3 SCALAR SCRIPT return_one() RETURNS INTEGER AS
+    def run(ctx):
+    return 1
+    /
+   ```
+
+
