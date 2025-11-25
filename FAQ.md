@@ -36,13 +36,13 @@ Doing that for many data nodes will cause a cluster reorganization that will get
 
 That is currently a theoretical possibility, though, since the license is for single nodes only.
 
-You cannot, however, replace the running the management node.
+You cannot, however, replace the running management node.
 
 ## Could I Resize a Data Node?
 
-Theoretically, yes. But it is not recommended.
+Theoretically, yes, but it is not recommended.
 
-Downsizing any data node will define the maximum RAM size of all the data nodes in the cluster and thus create a bottleneck.
+Downsizing any data node will define the maximum RAM size of all the data nodes in the cluster and, thus, create a bottleneck.
 
 ## How do I Upgrade the Version of a docker-db Container?
 
@@ -59,7 +59,7 @@ See also:
 
 No.
 
-We made docker-db to be used in functional testing, and that must work with local storage.
+We made docker-db to be used in functional testing and that must work with local storage.
 
 ## How do I Determine Service Health From Outside the Exasol Database?
 
@@ -69,16 +69,16 @@ We made docker-db to be used in functional testing, and that must work with loca
     SELECT 1;
     ```
 
-2. The BucketFS service can be checked by listing the buckets on the default port (2581). The return contain the entry `default`, which is the name of the one bucket that always exists right out of the box.
+2. The BucketFS service can be checked by listing the buckets on the default port (2581). The returned list contains the entry `default`, which is the name of the one bucket that always exists right out of the box. Depending on whether you added more buckets, there can be additional buckets.
 
     ```shell
     curl https://localhost:2581/ -k
     ```
    
-    The option `-k` disables the certificate check. If you want to also make sure in your health check that the TLS certificate is valid, you will need to install a proper certificate in the Exasol docker instance. Out of the box it comes with a self-signed certificate. 
+    The option `-k` disables the certificate check. If you want to also make sure in your health check that the TLS certificate is valid, you will need to install a proper certificate in the Exasol Docker instance. Out of the box it comes with a self-signed certificate. 
 
-3. You can check whether UDFs in your desired programming language are available by running a simple UDF script in that language.
-   Here is an example for checking whether Python UDFs are available.
+3. You can check if UDFs in your desired programming language are available by running a simple UDF script in that language.
+   Here is an example for checking if Python UDFs are available.
 
     ```sql
     -- Preparation
@@ -94,11 +94,11 @@ We made docker-db to be used in functional testing, and that must work with loca
     SELECT health_check.return_one();
     ```
    
-Please note that if you want to check from outside the docker network, you need port forwarding.
+Please note that if you want to check from outside the Docker network, you need port forwarding.
 
 Why would you need a UDF check at all? Depending on which Script Language Containers (SLC) you installed, different runtimes and libraries for certain programming languages are available.
 
-At the time of this writing (2025-11-25) `docker-db` comes with a SLCs for Java, Python and R preinstalled.
+At the time of this writing (2025-11-25), `docker-db` comes with a SLCs for Java, Python and R preinstalled.
 
 You also don't have to repeat this check. If the SQL engine works, and you established that the UDF language you need is there, testing once is sufficient.
 
