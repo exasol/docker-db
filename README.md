@@ -4,7 +4,7 @@
 
 > [!IMPORTANT]
 > Please note that the underlying base image for the Exasol 7.1 Docker image is CentOS 7, that has reached its end-of-life (EOL).
-> Consequently, official support for CentOS 7 is no longer available. __Please use Exasol 2025 or later__.
+> Consequently, official support for docker-db 7 is no longer available. __Please use Exasol 2025 or later__.
 
 > [!NOTE]
 > Since 2024-04-14 this repository only contains __documentation__ for the Exasol Docker image.
@@ -18,7 +18,7 @@
 Exasol is a high-performance, in-memory, MPP database specifically designed for analytics. 
 This repository contains a dockerized version of the Exasol DB for testing purposes.
 
-The dockerized version of Exasol in this repository can be used with up to 10GiB of data. If you need more, please get in contact with us via https://exasol.com/get-in-touch.
+Exasol's `docker-db` can be used with up to 10 GiB of data. If you need more, please get in contact with us via https://exasol.com/get-in-touch.
 
 Your use of this repository is subject to the [Exasol Terms & Conditions](https://www.exasol.com/terms-and-conditions)
 
@@ -103,10 +103,12 @@ When setting it to `host` the number of hugepages from the host system will be u
  
 ## Resource limitation
 
-It's possible to limit the resources of your Exasol container with the following `docker run` options: 
+It's possible to limit the resources of your Exasol container with the following `docker run` options:
+
 ```shell
 docker run --cpuset-cpus="1,2,3,4" --memory=20g --memory-swap=20g --memory-reservation=10g exasol/docker-db:<version>
 ```
+
 This is especially recommended if you have multiple Exasol containers (or other services) on the same host. In that case, you should evenly distribute the available CPUs and memory throughout your Exasol containers.
 
 See [https://docs.docker.com/config/containers/resource_constraints/](https://docs.docker.com/config/containers/resource_constraints/) for more options.
@@ -240,7 +242,7 @@ For more information on device management, see [Managing disks and devices](#man
 ```
 You can also change the volume size using the `exaconf` CLI tool from the Exasol image:
 ```shell
-docker run --rm -v ""$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf modify-volume -n DataVolume1 -s 1TiB
+docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf modify-volume -n DataVolume1 -s 1TiB
 ```
   
 #### Network port numbers (optional)
@@ -288,7 +290,7 @@ For more information on device management, see [Managing disks and devices](#man
 The cluster is started by creating all containers individually and passing each of them its ID from the EXAConf. For `n11` the command would be:
 
 ```shell
-docker run --detach --network=host --privileged -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" init-sc --node-id 11
+docker run --detach --network=host --privileged -v "$CONTAINER_EXA:/exa" exasol/docker-db:<version> init-sc --node-id 11
 ```
 
 > [!NOTE]
@@ -340,7 +342,7 @@ After the devices have been created, they need to be added to EXAConf. You can e
 or use the `exaconf` CLI tool from the Exasol image:
 
 ```shell
-docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf add-node-device -D disk1 -d dev.2 -n 11
+docker run --rm -v "$CONTAINER_EXA:/exa" exasol/docker-db:<version> exaconf add-node-device -D disk1 -d dev.2 -n 11
 ```
 
 ## Adding disks to EXAConf
@@ -360,9 +362,9 @@ Similar to adding devices, you can either manually edit EXAConf …
 … or use the `exaconf` CLI tool from the Exasol image:
 
 ```shell
-docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-dev-7.0.0:juk" exaconf add-node-disk -D disk2 -n 11
-docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf add-node-device -D disk2 -d dev.3 -n 11
-docker run --rm -v "$CONTAINER_EXA:/exa exasol/docker-db:<version>" exaconf add-node-device -D disk2 -d dev.4 -n 11
+docker run --rm -v "$CONTAINER_EXA:/exa" exasol/docker-dev-7.0.0:juk exaconf add-node-disk -D disk2 -n 11
+docker run --rm -v "$CONTAINER_EXA:/exa" exasol/docker-db:<version> exaconf add-node-device -D disk2 -d dev.3 -n 11
+docker run --rm -v "$CONTAINER_EXA:/exa" exasol/docker-db:<version> exaconf add-node-device -D disk2 -d dev.4 -n 11
 ```
 
 > [!NOTE]

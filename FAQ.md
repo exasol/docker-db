@@ -64,19 +64,42 @@ We made docker-db to be used in functional testing, and that must work with loca
 ## How do I Determine Service Health From Outside the Exasol Database?
 
 1. You can check the health of the database process by running a simple SQL query on the database port (default 8563).
+
     ```sql
     SELECT 1;
     ```
-2. The BucketFS service can be checked by listing the buckets on the default port (2581).
+
+2. The BucketFS service can be checked by listing the buckets on the default port (2581). The return contain the entry `default`, which is the name of the one bucket that always exists right out of the box.
+
     ```shell
-    curl -v https://localhost:2581/
+    curl https://localhost:2581/ -k
     ```
-3. You can check whether UDFs are available by running a simple UDF script. 
-   ```sql
-    CREATE OR REPLACE PYTHON3 SCALAR SCRIPT return_one() RETURNS INTEGER AS
+   
+    The option `-k` disables the certificate check. If you want to also make sure in your health check that the TLS certificate is valid, you will need to install a proper certificate in the Exasol docker instance. Out of the box it comes with a self-signed certificate. 
+
+3. You can check whether UDFs in your desired programming language are available by running a simple UDF script in that language.
+   Here is an example for checking whether Python UDFs are available.
+
+    ```sql
+    -- Preparation
+    CREATE SCHEMA health_check;
+    
+    CREATE OR REPLACE PYTHON3 SCALAR SCRIPT health_check.return_one() RETURNS INTEGER AS
     def run(ctx):
-        return 1
+    return 1
     /
-   ```
+    ;
+   
+    -- UDF Health Check 
+    SELECT health_check.return_one();
+    ```
    
 Please note that if you want to check from outside the docker network, you need port forwarding.
+
+Why would you need a UDF check at all? Depending on which Script Language Containers (SLC) you installed, different runtimes and libraries for certain programming languages are available.
+
+At the time of this writing (2025-11-25) `docker-db` comes with a SLCs for Java, Python and R preinstalled.
+
+You also don't have to repeat this check. If the SQL engine works, and you established that the UDF language you need is there, testing once is sufficient.
+
+If you plan to use the preinstalled SLC languages, you can even skip this check. 
