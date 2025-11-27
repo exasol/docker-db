@@ -121,6 +121,7 @@ You can create an Exasol container from the Exasol docker image using the follow
 ```shell
 docker run --name exasoldb -p 127.0.0.1:9563:8563 --detach --privileged --stop-timeout 120  exasol/docker-db:<version>
 ```
+The available version can be found on [Docker-Hub](https://hub.docker.com/r/exasol/docker-db/tags).
 
 In this example port 8563 (within the container) is exposed on the local port 9563. Use this port to connect to the DB.
 
