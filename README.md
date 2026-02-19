@@ -86,6 +86,14 @@ Make sure that **NTP** is configured correctly on the host. Also, the **RNG** da
 
 # Recommendations
  
+## Supplying an Exasol license on startup
+
+To change the default license that ships with the container image to a custom Exasol license, simply mount the license file read-only at `/.license.xml` inside the container.
+
+```console
+docker run -v ./license.exasol_license:/.license.xml:ro exasol/docker-db:<version>
+```
+
 ## Performance Optimization
 
 We strongly recommend setting the CPU governor on the host to `performance`, to avoid serious performance problems. There are various tools to do that, depending on your distribution. Usually, the following command works:
