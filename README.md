@@ -140,14 +140,16 @@ See [the Docker volumes documentation](https://docs.docker.com/engine/tutorials/
 It is important to make sure that the database has been shut down correctly before stopping a container. A high stop-timeout (see example above) increases the chance that the DB can be shut down gracefully before the container is stopped, but it's not guaranteed. It's better to stop the DB manually by executing the following command within the container (after attaching to it):
 
 ```shell
-dwad_client stop-wait DB1
+confd_client db_stop db_name: DB1 timeout: 660
 ```
 
 Or from outside the container:
 
 ```shell
-docker exec -ti exasoldb dwad_client stop-wait DB1
+docker exec -ti exasoldb confd_client db_stop db_name: DB1 timeout: 660
 ```
+
+A database shutdown takes at most 10 minutes. This adds some buffer to ensure there is enough time to return the status of the shutdown.
 
 ## Updating the Persistent Volume of a Stand-Alone Exasol Container
 
