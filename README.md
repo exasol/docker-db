@@ -76,7 +76,7 @@ The host OS must support `O_DIRECT` access for the Exasol containers (see [Troub
 
 ### AppArmor Settings on Ubuntu 23.10 or Later
 
-Exasol starts user defined functions (UDFs) in an isolated kernel namespace. [Ubuntu 23.00 and later have a AppArmor default setting that restricts unprivileged use namespaces](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
+Exasol starts user defined functions (UDFs) in an isolated kernel namespace. [Ubuntu 23.00 and later have a AppArmor default setting that restricts unprivileged user namespaces](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
 
 This leads to the error `VM crashed` when a UDF is started.
 
