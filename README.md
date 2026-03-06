@@ -66,13 +66,25 @@ Docker privileged mode is required for permissions management, UDF support and e
 
 ## CPU Architecture
 
-Exasol currently only supports 64-bit *x86-64* platforms with SSSE3 featured CPUs (Intel64 or AMD64) and is for this architecture optimized. See also the [System Requirements](https://docs.exasol.com/db/7.1/administration/on-premise/installation/system_requirements.htm).
+Exasol currently only supports 64-bit *x86-64* platforms with SSSE3 featured CPUs (Intel64 or AMD64) and is for this architecture optimized. See also the [System Requirements](https://docs.exasol.com/db/latest/administration/on-premise/installation/system_requirements.htm).
 
 ## Host Operating System
 
 We currently only support Docker on Linux. If you are using a Windows host, you'd have to create a Linux VM.
 
 The host OS must support `O_DIRECT` access for the Exasol containers (see [Troubleshooting](#troubleshooting)).
+
+### AppArmor Settings on Ubuntu 23.10 or Later
+
+Exasol starts user defined functions (UDFs) in an isolated kernel namespace. [Ubuntu 23.00 and later have a AppArmor default setting that restricts unprivileged user namespaces](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
+
+This leads to the error `VM crashed` when a UDF is started.
+
+To fix this, please change the following AppArmor setting:
+
+```shell
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+```
 
 ## Host Environment
 
