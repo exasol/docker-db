@@ -484,7 +484,7 @@ Replace `PASSWORD` with the `WritePasswd` for the bucket. See [Connecting to Buc
 
 Connecting to the default Exasol DB inside a Docker container is not different from the "normal" version. You can use any supported client and authenticate with username `sys` and password `exasol`. 
 
-Please refer to the [official manual](https://www.exasol.com/portal/display/DOC/Database+User+Manual) for further information.
+Please refer to the [Exasol documentation](https://docs.exasol.com) for further information.
 
 ## Connecting to BucketFS
 
@@ -497,7 +497,7 @@ You can find them in the EXAConf. They are base64-encoded and can be decoded lik
 awk '/WritePasswd/{ print $3; }' EXAConf | base64 -d
 ```
 
-Please refer to the [BucketFS manual](https://docs.exasol.com/database_concepts/bucketfs/access_control.htm) for information on how to access files in the BucketFS.
+Please refer to the [BucketFS manual](https://docs.exasol.com/db/latest/administration/on-premise/bucketfs/bucketfs.htm) for information on how to access files in the BucketFS.
 
 # Troubleshooting
 
